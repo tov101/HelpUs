@@ -1,0 +1,9 @@
+*__pycache__*
+.idea*
+build*
+dist*
+*log
+*egg-info*
+venv*
+snake.ico
+snake*png
