@@ -85,7 +85,7 @@ setup(
 
         # Indicate who your project is intended for
         'Intended Audience :: Developers',
-        'Topic :: Debug :: Python GUI Apps',
+        'Topic :: Software Development :: Bug Tracking',
 
         # Pick your license as you wish (should match "license" above)
         'License :: Public Domain',
