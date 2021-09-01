@@ -5,23 +5,10 @@ import sys
 
 # To use a consistent encoding
 from codecs import open
-from distutils.command.register import register as register_orig
-from distutils.command.upload import upload as upload_orig
 # Always prefer setuptools over distutils
 from setuptools import setup
 
 from helpus.version import __version__
-
-
-class Register(register_orig):
-    def _get_rc_file(self):
-        return os.path.join('.', '.pypirc')
-
-
-class Upload(upload_orig):
-    def _get_rc_file(self):
-        return os.path.join('.', '.pypirc')
-
 
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(here, "helpus"))
@@ -155,8 +142,5 @@ setup(
     #            'sample=sample:main',
     #        ],
     #    },
-    cmdclass={
-        'register': Register,
-        'upload':   Upload,
-    }
+    download_url='https://github.com/tov101/HelpUs/archive/refs/tags/v0.0.1.tar.gz'
 )
