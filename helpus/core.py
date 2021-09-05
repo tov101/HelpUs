@@ -2,52 +2,49 @@ import io
 import logging
 import os
 import sys
+import threading
+import time
 
 from PyQt5 import QtGui, QtCore, QtWidgets
+
 from helpus import icon_file_path
+from helpus.utils.utils import XStream
+from helpus.utils.remote import RCServer
 from helpus import __version__
 
 LOGGER = logging.getLogger('HelpUs')
 LOGGER.setLevel(logging.DEBUG)
 
 
-class XStream(QtCore.QObject):
-    _stdout = None
-    _stderr = None
-    messageWritten = QtCore.pyqtSignal(str)
-
-    @staticmethod
-    def flush():
-        pass
-
-    @staticmethod
-    def fileno():
-        return -1
-
-    def write(self, msg):
-        if not self.signalsBlocked():
-            self.messageWritten.emit(msg)
-
-    @staticmethod
-    def stdout():
-        if not XStream._stdout:
-            XStream._stdout = XStream()
-            sys.stdout = XStream._stdout
-        return XStream._stdout
-
-    @staticmethod
-    def stderr():
-        if not XStream._stderr:
-            XStream._stderr = XStream()
-            sys.stderr = XStream._stderr
-        return XStream._stderr
+def get_qtconsole_object():
+    if isinstance(sys.stdin, HelpUs):
+        return sys.stdin.console
+    else:
+        return HelpUs.console
 
 
-class MyBreakPoint(QtWidgets.QDialog):
-    _stdout = None
-    _stderr = None
-    messageWritten = QtCore.pyqtSignal(str)
+def setup_breakpoint_hook(parent, method, redirect_streams=False, remote=False):
+    def __method(*args, **kwargs):
+        breakpoint()
+        return method(*args, **kwargs)
 
+    if not isinstance(sys.stdin, HelpUs):
+        sys.stdin = HelpUs(parent=parent, remote=remote)
+    else:
+        # Restore Streams
+        sys.stdin = sys.__stdin__
+        sys.stdout = sys.__stdout__
+        sys.stderr = sys.__stderr__
+        raise Exception(
+            "Multiple Instances are not allowed. Can be possible, but I'm to lazy to go deep with development."
+        )
+
+    if redirect_streams:
+        sys.stdin.redirect_outerr_stream()
+    return __method
+
+
+class HelpUs(QtWidgets.QDialog):
     HOOK_HEADER = '(Pdb) '
     HOOK_INTERACT = '>>> '
     HOOK_LINE_BREAK = '... '
@@ -62,7 +59,12 @@ class MyBreakPoint(QtWidgets.QDialog):
         'Down'
     ]
 
-    def __init__(self, parent=None):
+    def __init__(
+            self,
+            parent=None,
+            remote: bool = False
+    ):
+
         super().__init__()
 
         if not parent:
@@ -120,6 +122,13 @@ class MyBreakPoint(QtWidgets.QDialog):
         # Init Buffer
         self.buffer = io.StringIO()
         self.__set_enable_gui(False)
+
+        if remote:
+            self.remote_control_active = remote
+            self.__remote = RCServer()
+            self.__remote.start()
+            self.__remote_receive()
+
         self.showNormal()
 
     def __set_enable_gui(self, state=True):
@@ -189,7 +198,7 @@ class MyBreakPoint(QtWidgets.QDialog):
         current_cursor_column = self.console.textCursor().columnNumber()
 
         # If Enter was pressed -> Process Expression
-        if event.key() == QtCore.Qt.Key.Key_Return and text:
+        if event.key() == QtCore.Qt.Key_Return and text:
             # Consider Custom Clear Screen Command
             if text == 'cls':
                 self.__clear_screen(raw_last_line)
@@ -208,15 +217,15 @@ class MyBreakPoint(QtWidgets.QDialog):
             self.__set_enable_gui(False)
 
         # If User want to delete something and there is no value in buffer -> Reject
-        if event.key() == QtCore.Qt.Key.Key_Backspace or event.key() == QtCore.Qt.Key.Key_Delete:
+        if event.key() == QtCore.Qt.Key_Backspace or event.key() == QtCore.Qt.Key_Delete:
             if current_cursor_line != line_from_zero or current_cursor_column <= len(current_hook):
                 return
 
-        if event.key() == QtCore.Qt.Key.Key_Home and current_cursor_line == line_from_zero:
+        if event.key() == QtCore.Qt.Key_Home and current_cursor_line == line_from_zero:
             if text:
                 temp_cursor = self.console.textCursor()
                 temp_cursor.movePosition(
-                    QtGui.QTextCursor.MoveOperation.StartOfLine,
+                    QtGui.QTextCursor.MoveAnchor.StartOfLine,
                     QtGui.QTextCursor.MoveMode.MoveAnchor
                 )
                 temp_cursor.movePosition(
@@ -231,6 +240,18 @@ class MyBreakPoint(QtWidgets.QDialog):
         self.console.setTextColor(QtCore.Qt.GlobalColor.black)
         # Execute default method
         QtWidgets.QTextEdit.keyPressEvent(self.console, event)
+
+    def __remote_receive(self):
+        def __thread_poll():
+            while True:
+                data = self.__remote.receive()
+                if data:
+                    self.__reset_buffer()
+                    self.buffer.write(data)
+                    self.__set_enable_gui(False)
+                time.sleep(0.01)
+
+        threading.Thread(name='HelpUs_RemoteReceive', target=__thread_poll).start()
 
     def __push_button(self):
         # Read text from Button and use it as pdb keyword
@@ -248,6 +269,9 @@ class MyBreakPoint(QtWidgets.QDialog):
             self.buffer = io.StringIO()
 
     def __insert_plain_text(self, message):
+        # Send Output To RCServer
+        if self.remote_control_active:
+            self.__remote.send(message)
         # Do some stylistics
         if message.startswith(self.HOOK_HEADER):
             self.console.setTextColor(QtCore.Qt.GlobalColor.magenta)
@@ -275,39 +299,16 @@ class MyBreakPoint(QtWidgets.QDialog):
         self.console.insertPlainText(current_hook)
 
 
-def get_qtconsole_object():
-    if isinstance(sys.stdin, MyBreakPoint):
-        return sys.stdin.console
-    else:
-        return MyBreakPoint.console
-
-
-def setup_breakpoint_hook(parent, method, redirect_streams=False):
-    def __method(*args, **kwargs):
-        breakpoint()
-        return method(*args, **kwargs)
-
-    if not isinstance(sys.stdin, MyBreakPoint):
-        sys.stdin = MyBreakPoint(parent)
-    else:
-        # Restore Streams
-        sys.stdin = sys.__stdin__
-        sys.stdout = sys.__stdout__
-        sys.stderr = sys.__stderr__
-        raise Exception(
-            "Multiple Instances are not allowed. Can be possible, but I'm to lazy to go deep with development."
-        )
-
-    if redirect_streams:
-        sys.stdin.redirect_outerr_stream()
-    return __method
-
-
 if __name__ == '__main__':
     p = QtWidgets.QApplication(sys.argv)
     LOGGER.error('Ceva')
 
-    LOGGER.error = setup_breakpoint_hook(None, LOGGER.error, redirect_streams=True)
+    LOGGER.error = setup_breakpoint_hook(
+        parent=None,
+        method=LOGGER.error,
+        redirect_streams=True,
+        remote=True
+    )
     # LOGGER.error = setup_breakpoint_hook(None, LOGGER.error, redirect_streams=True)
 
     x = 90

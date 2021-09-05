@@ -25,7 +25,7 @@ else:
     # Module Imports
     from .version import __version__
     from .core import (
-        MyBreakPoint,
+        HelpUs,
         setup_breakpoint_hook,
         get_qtconsole_object
     )
@@ -36,7 +36,7 @@ else:
     __all__ = [
         '__version__',
         'icon_file_path',
-        'MyBreakPoint',
+        'HelpUs',
         'get_qtconsole_object',
         'setup_breakpoint_hook',
     ]
