@@ -1,2 +1,3 @@
+pylint
 PyQt5
 stringify

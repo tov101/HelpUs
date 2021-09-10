@@ -1,6 +1,7 @@
 import io
 import logging
 import os
+import queue
 import sys
 import threading
 import time
@@ -48,8 +49,10 @@ class HelpUs(QtWidgets.QDialog):
     HOOK_HEADER = '(Pdb) '
     HOOK_INTERACT = '>>> '
     HOOK_LINE_BREAK = '... '
+    HOOK_ERROR = '***'
     HOOKS = [HOOK_HEADER, HOOK_INTERACT]
 
+    CLEAR_SCREEN = 'cls'
     BUTTONS = [
         'Continue',
         'Next',
@@ -123,11 +126,14 @@ class HelpUs(QtWidgets.QDialog):
         self.buffer = io.StringIO()
         self.__set_enable_gui(False)
 
+        # RC Server
+        self.__remote = None
+        self.__send_queue = queue.PriorityQueue()
+        self.__event_ready_to_go = threading.Event()
         if remote:
-            self.remote_control_active = remote
             self.__remote = RCServer()
             self.__remote.start()
-            self.__remote_receive()
+            self.__remote_exchange()
 
         self.showNormal()
 
@@ -200,7 +206,7 @@ class HelpUs(QtWidgets.QDialog):
         # If Enter was pressed -> Process Expression
         if event.key() == QtCore.Qt.Key_Return and text:
             # Consider Custom Clear Screen Command
-            if text == 'cls':
+            if text == self.CLEAR_SCREEN:
                 self.__clear_screen(raw_last_line)
                 return
 
@@ -241,17 +247,37 @@ class HelpUs(QtWidgets.QDialog):
         # Execute default method
         QtWidgets.QTextEdit.keyPressEvent(self.console, event)
 
-    def __remote_receive(self):
+    def __remote_exchange(self):
         def __thread_poll():
             while True:
+                # Receive Data
                 data = self.__remote.receive()
                 if data:
+                    # Set Event Ready to Go -> Allow queue to store entries and send it back
+                    self.__event_ready_to_go.set()
+                    # Write Data into Buffer
                     self.__reset_buffer()
                     self.buffer.write(data)
+                    # Write Data into Console also
+                    self.console.insertPlainText('RC: {}\n'.format(data))
                     self.__set_enable_gui(False)
-                time.sleep(0.01)
 
-        threading.Thread(name='HelpUs_RemoteReceive', target=__thread_poll).start()
+                    messages = []
+                    # Wait to have something in queue
+                    while self.__send_queue.empty():
+                        time.sleep(0.01)
+                    while not self.__send_queue.empty() and messages.count(self.HOOK_HEADER) <= 2:
+                        __item = self.__send_queue.get_nowait()
+                        if messages.count(self.HOOK_HEADER) > 1 and __item == self.HOOK_HEADER:
+                            break
+                        messages.append(__item)
+                        # Give some time to fill all the value in queue
+                        time.sleep(0.01)
+                    message = ''.join(reversed(messages))
+                    self.__remote.send(message)
+                    self.__event_ready_to_go.clear()
+
+        threading.Thread(name='HelpUs_RemoteReceive', target=__thread_poll, daemon=True).start()
 
     def __push_button(self):
         # Read text from Button and use it as pdb keyword
@@ -270,8 +296,9 @@ class HelpUs(QtWidgets.QDialog):
 
     def __insert_plain_text(self, message):
         # Send Output To RCServer
-        if self.remote_control_active:
-            self.__remote.send(message)
+        if self.__remote and self.__event_ready_to_go.is_set():
+            self.__send_queue.put_nowait(item=message)
+
         # Do some stylistics
         if message.startswith(self.HOOK_HEADER):
             self.console.setTextColor(QtCore.Qt.GlobalColor.magenta)
@@ -282,7 +309,7 @@ class HelpUs(QtWidgets.QDialog):
             QtWidgets.QTextEdit.insertPlainText(self.console, message)
             return
 
-        if message.startswith('***'):
+        if message.startswith(self.HOOK_ERROR):
             self.console.setTextColor(QtCore.Qt.GlobalColor.red)
 
         QtWidgets.QTextEdit.insertPlainText(self.console, message)
