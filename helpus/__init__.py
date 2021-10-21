@@ -16,7 +16,7 @@ def not_used(item):
 # Define Icon Path
 icon_file_path = os.path.join(os.path.dirname(__file__), 'resources', 'ico', 'snake.ico')
 # Define Log File
-helpus_log_file = os.path.join(os.path.dirname(__file__), ' HelpUs.log')
+helpus_log_file = os.path.join(os.path.dirname("__file__"), ' HelpUs.log')
 
 # CleanUp Existing LogFile
 if os.path.exists(helpus_log_file):
@@ -55,7 +55,7 @@ else:
     # Config Logger
     LOGGING_CONFIGURATION = {
         'version': 1,
-        'disable_existing_loggers': True,
+        'disable_existing_loggers': False,
         'formatters': {
             'verbose': {'format': '%(name)s[%(levelname)s]: %(message)s'},
             'simple': {'format': '%(name)s[%(levelname)s]: %(message)s'}
