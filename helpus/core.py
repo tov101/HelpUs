@@ -309,7 +309,7 @@ class HelpUs(QtWidgets.QDialog):
             self.console.setTextColor(QtCore.Qt.GlobalColor.darkMagenta)
             QtWidgets.QTextEdit.insertPlainText(self.console, message)
             return
-        else:
+        elif not message.startswith('RC: ') and message.strip():
             # Log outputs
             LOGGER.info(message)
 
