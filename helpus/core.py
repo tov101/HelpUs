@@ -14,7 +14,6 @@ from helpus.utils.remote import RCServer
 from helpus import __version__
 
 LOGGER = logging.getLogger('HelpUs')
-LOGGER.setLevel(logging.DEBUG)
 
 
 def get_qtconsole_object():
@@ -173,6 +172,8 @@ class HelpUs(QtWidgets.QDialog):
         while self.buffer.tell() == 0:
             QtCore.QCoreApplication.processEvents()
         value = self.buffer.getvalue()
+        # Log all Inputs from Buffer
+        LOGGER.info(value)
         return value
 
     def __key_press_event(self, event):
@@ -308,6 +309,9 @@ class HelpUs(QtWidgets.QDialog):
             self.console.setTextColor(QtCore.Qt.GlobalColor.darkMagenta)
             QtWidgets.QTextEdit.insertPlainText(self.console, message)
             return
+        else:
+            # Log outputs
+            LOGGER.info(message)
 
         if message.startswith(self.HOOK_ERROR):
             self.console.setTextColor(QtCore.Qt.GlobalColor.red)
