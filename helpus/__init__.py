@@ -16,7 +16,7 @@ def not_used(item):
 # Define Icon Path
 icon_file_path = os.path.join(os.path.dirname(__file__), 'resources', 'ico', 'snake.ico')
 # Define Log File
-helpus_log_file = os.path.join(os.path.dirname("__file__"), ' HelpUs.log')
+helpus_log_file = os.path.join(os.path.dirname("__file__"), 'HelpUs.log')
 
 # CleanUp Existing LogFile
 if os.path.exists(helpus_log_file):
