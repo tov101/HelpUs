@@ -6,7 +6,7 @@ import sys
 import threading
 import time
 
-from PyQt5 import QtGui, QtCore, QtWidgets
+from PySide6 import QtGui, QtCore, QtWidgets
 
 from helpus import icon_file_path
 from helpus.utils.utils import XStream
@@ -108,6 +108,7 @@ class HelpUs(QtWidgets.QDialog):
         # Create OutputConsole
         self.console = QtWidgets.QTextEdit(parent)
         self.console.insertPlainText = self.__insert_plain_text
+        self.console.setAcceptRichText(False)
         self.console.keyPressEvent = self.__key_press_event
         self.ConsoleLayout.addWidget(self.console)
 

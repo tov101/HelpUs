@@ -87,7 +87,7 @@ class RCServer(threading.Thread):
         # Initialization Part
         self.__socket.bind((HOST, PORT))
         self.__socket.listen()
-        while not self.__event_close.isSet():
+        while not self.__event_close.is_set():
             self.__event_receive.set()
             self.__event_send.clear()
             connection, addr = self.__socket.accept()
