@@ -1,11 +1,14 @@
 import sys
-from PyQt5 import QtCore
+
+from PySide6 import QtCore
 
 
 class XStream(QtCore.QObject):
     _stdout = None
     _stderr = None
-    messageWritten = QtCore.pyqtSignal(str)
+
+    # messageWritten = ENGINE.QtCore.pyqtSignal(str)
+    messageWritten = QtCore.Signal(str)
 
     @staticmethod
     def flush():

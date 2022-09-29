@@ -3,7 +3,6 @@ import os
 
 
 # Do not Import Stuff from 'module' here because will raise ImportError because of Circular import
-
 def not_used(item):
     """
     Just to make PyLint happy.
@@ -54,24 +53,24 @@ else:
 
     # Config Logger
     LOGGING_CONFIGURATION = {
-        'version': 1,
+        'version':                  1,
         'disable_existing_loggers': False,
-        'formatters': {
+        'formatters':               {
             'verbose': {'format': '%(name)s[%(levelname)s]: %(message)s'},
-            'simple': {'format': '%(name)s[%(levelname)s]: %(message)s'}
+            'simple':  {'format': '%(name)s[%(levelname)s]: %(message)s'}
         },
-        'handlers': {
+        'handlers':                 {
             'file': {
-                'level': 'DEBUG',
-                'class': 'logging.handlers.RotatingFileHandler',
-                'filename': helpus_log_file,
+                'level':     'DEBUG',
+                'class':     'logging.handlers.RotatingFileHandler',
+                'filename':  helpus_log_file,
                 'formatter': 'verbose'
             }
         },
-        'loggers': {
+        'loggers':                  {
             'HelpUs': {
-                'handlers': ['file'],
-                'level': 'DEBUG',
+                'handlers':  ['file'],
+                'level':     'DEBUG',
                 'propagate': False
             }
         }

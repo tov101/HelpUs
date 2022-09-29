@@ -3,8 +3,8 @@ import struct
 import threading
 import time
 
-HOST = '127.0.0.1'
-PORT = 0x2101
+LOCALHOST = '127.0.0.1'
+PORT = 0x2102  # 8450
 ENCODING = 'ascii'
 
 
@@ -13,11 +13,20 @@ def not_used(item):
 
 
 class RCServer(threading.Thread):
-    def __init__(self):
+    def __init__(self, host=LOCALHOST, port=PORT):
         super(RCServer, self).__init__()
         # Give a name to this thread
         self.name = 'HelpUs_RemoteServer'
         self.daemon = True
+
+        if not host:
+            self.host = LOCALHOST
+        else:
+            self.host = host
+        if not port:
+            self.port = PORT
+        else:
+            self.port = port
 
         # Init Socket
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -85,9 +94,9 @@ class RCServer(threading.Thread):
 
     def run(self):
         # Initialization Part
-        self.__socket.bind((HOST, PORT))
+        self.__socket.bind((self.host, self.port))
         self.__socket.listen()
-        while not self.__event_close.isSet():
+        while not self.__event_close.is_set():
             self.__event_receive.set()
             self.__event_send.clear()
             connection, addr = self.__socket.accept()
@@ -121,7 +130,7 @@ class RCClient:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-    def connect(self):
+    def connect(self, host=LOCALHOST, port=PORT):
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
@@ -129,7 +138,7 @@ class RCClient:
         except Exception as don_t_care:
             not_used(don_t_care)
         self.__socket.settimeout(1)
-        self.__socket.connect((HOST, PORT))
+        self.__socket.connect((host, port))
         self.__socket.settimeout(None)
         self.__socket.setblocking(True)
 
@@ -189,13 +198,15 @@ if __name__ == '__main__':
             print(x.receive())
             print(x.send(input()))
     else:
+        remote_host = input()
+        remote_port = int(input())
         x = RCClient()
         while not x.ping():
             time.sleep(0.1)
-        x.connect()
+        x.connect(remote_host, remote_port)
         x.close()
-        x.connect()
+        x.connect(remote_host, remote_port)
         x.close()
-        x.connect()
+        x.connect(remote_host, remote_port)
         while True:
             print(x.exchange(input()))

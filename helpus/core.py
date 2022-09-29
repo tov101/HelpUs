@@ -6,12 +6,12 @@ import sys
 import threading
 import time
 
-from PyQt5 import QtGui, QtCore, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
-from helpus import icon_file_path
-from helpus.utils.utils import XStream
-from helpus.utils.remote import RCServer
 from helpus import __version__
+from helpus import icon_file_path
+from helpus.utils.remote import RCServer
+from helpus.utils.utils import XStream
 
 LOGGER = logging.getLogger('HelpUs')
 
@@ -23,13 +23,34 @@ def get_qtconsole_object():
         return HelpUs.console
 
 
-def setup_breakpoint_hook(parent, method, redirect_streams=False, remote=False):
+def setup_breakpoint_hook(
+        parent,
+        method,
+        redirect_streams: bool = False,
+        remote: bool = False,
+        remote_host: str = None,
+        remote_port: int = None
+):
+    """
+
+    :param parent:
+    :param method:
+    :param redirect_streams:
+    :param remote:
+    :param remote_host:
+    :param remote_port:
+    :return:
+    """
+
     def __method(*args, **kwargs):
         breakpoint()
         return method(*args, **kwargs)
 
     if not isinstance(sys.stdin, HelpUs):
-        sys.stdin = HelpUs(parent=parent, remote=remote)
+        args = (parent, remote)
+        if remote_host and remote_port:
+            args = (parent, remote, remote_host, remote_port)
+        sys.stdin = HelpUs(*args)
     else:
         # Restore Streams
         sys.stdin = sys.__stdin__
@@ -64,8 +85,17 @@ class HelpUs(QtWidgets.QDialog):
     def __init__(
             self,
             parent=None,
-            remote: bool = False
+            remote: bool = False,
+            remote_host: str = None,
+            remote_port: int = None
     ):
+        """
+
+        :param parent:
+        :param remote:
+        :param remote_host:
+        :param remote_port:
+        """
 
         super().__init__()
 
@@ -108,6 +138,7 @@ class HelpUs(QtWidgets.QDialog):
         # Create OutputConsole
         self.console = QtWidgets.QTextEdit(parent)
         self.console.insertPlainText = self.__insert_plain_text
+        self.console.setAcceptRichText(False)
         self.console.keyPressEvent = self.__key_press_event
         self.ConsoleLayout.addWidget(self.console)
 
@@ -130,7 +161,10 @@ class HelpUs(QtWidgets.QDialog):
         self.__send_queue = queue.PriorityQueue()
         self.__event_ready_to_go = threading.Event()
         if remote:
-            self.__remote = RCServer()
+            args = tuple()
+            if remote_host and remote_port:
+                args = (remote_host, remote_port)
+            self.__remote = RCServer(*args)
             self.__remote.start()
             self.__remote_exchange()
 
