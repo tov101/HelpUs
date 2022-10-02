@@ -27,6 +27,7 @@ if os.path.exists(helpus_log_file):
 try:
     # Try to restore files
     from stringify import unstringify
+
     from .resources.resources import snake_ico as ico_data
 
     # Restore Files
@@ -42,15 +43,9 @@ except ImportError as e:
 
 else:
     # Module Imports
-    from .version import __version__
-    from .core import (
-        HelpUs,
-        setup_breakpoint_hook,
-        get_qtconsole_object
-    )
+    from helpus.source.core import HelpUs, get_qtconsole_object, setup_breakpoint_hook
 
     # ------------------------------------
-
     # Config Logger
     LOGGING_CONFIGURATION = {
         'version':                  1,
@@ -81,7 +76,6 @@ else:
 
     # Export Visible Items
     __all__ = [
-        '__version__',
         'icon_file_path',
         'HelpUs',
         'get_qtconsole_object',

@@ -198,8 +198,8 @@ if __name__ == '__main__':
             print(x.receive())
             print(x.send(input()))
     else:
-        remote_host = input()
-        remote_port = int(input())
+        remote_host = '127.0.0.1'
+        remote_port = 8450
         x = RCClient()
         while not x.ping():
             time.sleep(0.1)

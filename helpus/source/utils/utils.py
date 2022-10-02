@@ -3,6 +3,10 @@ import sys
 from PySide6 import QtCore
 
 
+def not_used(item):
+    assert item == item
+
+
 class XStream(QtCore.QObject):
     _stdout = None
     _stderr = None
