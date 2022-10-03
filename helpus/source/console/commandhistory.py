@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from qtpy.QtCore import QObject
+from PySide6.QtCore import QObject
 
 
 class CommandHistory(QObject):

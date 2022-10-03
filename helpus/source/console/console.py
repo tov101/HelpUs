@@ -34,11 +34,15 @@ class BaseConsole(QtWidgets.QTextEdit):
         # HelpUs Buffer
         self.stdin = io.StringIO()
 
+        # Method for stream
         self.stream = stream
 
         # Event Filter
         self.installEventFilter(self)
         self._key_event_handlers = self._get_key_event_handlers()
+
+        # Store Current Char Text Format
+        self.__default_ctf = self.currentCharFormat()
 
         # Set Focus
         self.setFocusPolicy(Qt.StrongFocus)
@@ -53,13 +57,15 @@ class BaseConsole(QtWidgets.QTextEdit):
         self._default_position = cursor.position()
 
     def insertPlainText(self, text: str) -> None:
-        # Stream Data
-        self.stream(text)
-
         if text == BaseConsole.HOOK_PDB:
             self.show_header()
+            self.stream('')
             return
-        elif text.startswith(BaseConsole.HOOK_ERROR):
+
+        # Stream Data
+        self.stream(text.strip())
+
+        if text.startswith(BaseConsole.HOOK_ERROR):
             self.setTextColor(QtCore.Qt.GlobalColor.red)
         elif not text.startswith('RC: ') and text.strip():
             self.setTextColor(QtCore.Qt.GlobalColor.black)
@@ -76,7 +82,7 @@ class BaseConsole(QtWidgets.QTextEdit):
         cursor = self.textCursor()
         cursor.movePosition(QTextCursor.End)
         self.setTextCursor(cursor)
-        self.textCursor().insertText(text)
+        self.textCursor().insertText(text, self.__default_ctf)
 
     def eventFilter(self, edit, event):
         """Intercepts events from the input control."""
@@ -106,7 +112,7 @@ class BaseConsole(QtWidgets.QTextEdit):
 
     def insertFromMimeData(self, mime_data):
         if mime_data and mime_data.hasText():
-            self.insertPlainText(mime_data.text())
+            self.insertText(mime_data.text())
 
     def _filter_mousePressEvent(self, event):
         if event.button() == Qt.MiddleButton:
@@ -216,7 +222,8 @@ class BaseConsole(QtWidgets.QTextEdit):
             if event.modifiers() == Qt.ControlModifier:
                 cursor.movePosition(
                     QTextCursor.NextWord,
-                    QTextCursor.KeepAnchor, 1)
+                    QTextCursor.KeepAnchor, 1
+                )
                 self._reset_cursor()
             else:
                 # delete spaces to next tabstop boundary:
@@ -224,7 +231,8 @@ class BaseConsole(QtWidgets.QTextEdit):
                 num = len(tab) if tabstop and right.startswith(tab) else 1
                 cursor.movePosition(
                     QTextCursor.NextCharacter,
-                    QTextCursor.KeepAnchor, num)
+                    QTextCursor.KeepAnchor, num
+                )
         self._remove_selected_input(cursor)
         return True
 
@@ -340,12 +348,9 @@ class BaseConsole(QtWidgets.QTextEdit):
         self.setTextCursor(cursor)
         self.ensureCursorVisible()
 
-    def input_buffer(self, to_stream=False):
+    def input_buffer(self):
         """Retrieve current input buffer in string form."""
         text = self.toPlainText()[self._default_position:]
-        # TODO: Fix it
-        if to_stream:
-            return text
         return text
 
     def clear_input_buffer(self):
