@@ -79,9 +79,10 @@ class BaseConsole(QtWidgets.QTextEdit):
         self.ensureCursorVisible()
 
     def insertText(self, text):
-        cursor = self.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self.setTextCursor(cursor)
+        # Do not move cursor at the end
+        # cursor = self.textCursor()
+        # cursor.movePosition(QTextCursor.End)
+        # self.setTextCursor(cursor)
         self.textCursor().insertText(text, self.__default_ctf)
 
     def eventFilter(self, edit, event):
@@ -312,14 +313,13 @@ class BaseConsole(QtWidgets.QTextEdit):
             self.command_history.inc()
         return True
 
-    def _handle_left_key(self, event):
+    def _handle_left_key(self, _event):
         """
         Move cursor to left but no more than self._default_position
-        :param event:
+        :param _event:
         :return:
         """
-        not_used(event)
-        return self.cursor_offset() < self._default_position
+        return self.cursor_offset() > self._default_position
 
     def _handle_c_key(self, event):
         intercepted = False
