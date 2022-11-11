@@ -1,5 +1,6 @@
 import io
 import logging
+import re
 from typing import Callable
 
 from PySide6 import QtCore, QtWidgets
@@ -9,6 +10,7 @@ from PySide6.QtWidgets import QApplication
 
 from helpus import not_used
 from helpus.source.console.commandhistory import CommandHistory
+from helpus.source.console.syntax import SyntaxHighlighter
 
 LOGGER = logging.getLogger('HelpUs')
 
@@ -18,13 +20,14 @@ class BaseConsole(QtWidgets.QTextEdit):
     HOOK_INTERACT = '>>> '
     HOOK_LINE_BREAK = '... '
     HOOK_ERROR = '***'
-    HOOKS = [HOOK_PDB, HOOK_INTERACT]
+    HOOKS = [HOOK_PDB, ]
 
     CLEAR_SCREEN = 'cls'
 
     def __init__(self, stream: Callable = None, *args):
         super(BaseConsole, self).__init__(*args)
         # Vars
+        self._current_header = BaseConsole.HOOK_PDB
         self._default_position = 0
         self._tab_chars = ' ' * 4
 
@@ -48,16 +51,22 @@ class BaseConsole(QtWidgets.QTextEdit):
         self.setFocusPolicy(Qt.StrongFocus)
         self.setFocus()
 
+        SyntaxHighlighter(self.document())
+
     def show_header(self):
         cursor = self.textCursor()
         cursor.movePosition(QTextCursor.End)
         # Do some stylistics
         self.setTextColor(QtCore.Qt.GlobalColor.magenta)
-        QtWidgets.QTextEdit.insertPlainText(self, BaseConsole.HOOK_PDB)
+        QtWidgets.QTextEdit.insertPlainText(self, self._current_header)
         self._default_position = cursor.position()
 
     def insertPlainText(self, text: str) -> None:
-        if text == BaseConsole.HOOK_PDB:
+        # Look for HOOK_PDB even if this comes from recursive debugger
+        _result = re.search(pattern=r'\({1,}Pdb\){1,}\s', string=text)
+        self._current_header = _result.group(0) if _result else BaseConsole.HOOK_PDB
+
+        if text == self._current_header:
             self.show_header()
             self.stream('')
             return

@@ -134,7 +134,7 @@ class HelpUs(QtWidgets.QDialog):
         self.setFocusPolicy(Qt.NoFocus)
         self.console.setFocus()
 
-        self.__enable_gui(False)
+        # self.__enable_gui(False)
 
         # RC Server
         self.__remote = None
@@ -236,6 +236,8 @@ class HelpUs(QtWidgets.QDialog):
 if __name__ == '__main__':
     p = QtWidgets.QApplication(sys.argv)
     LOGGER.error('Ceva')
+
+    HelpUs().exec_()
 
     LOGGER.error = setup_breakpoint_hook(
         parent=None,
