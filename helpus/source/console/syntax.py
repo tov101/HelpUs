@@ -30,7 +30,7 @@ STYLES = {
     'string':             format('magenta'),
     'string2':            format('darkMagenta'),
     'comment':            format('green', 'italic'),
-    'self':               format('black', 'italic'),
+    'self':               format('darkMagenta'),
     'numbers':            format('brown'),
     # Evaluate Keywords
     'conditions':         format('magenta'),
@@ -50,7 +50,7 @@ class PythonSyntax:
         'for', 'from', 'global', 'if', 'import', 'in',
         'is', 'lambda', 'not', 'or', 'pass', 'print',
         'raise', 'return', 'try', 'while', 'yield',
-        'None', 'True', 'False',
+        'None', 'True', 'False', 'as',
     ]
 
     # Python operators
@@ -155,11 +155,11 @@ class SyntaxHighlighter(QtGui.QSyntaxHighlighter):
                     continue
 
                 # We actually want the index of the nth match
-                expression_match = expression.match(text)
+                expression_match = expression.match(text, index)
                 index = expression_match.capturedStart(nth)
                 length = expression_match.capturedLength(nth)
                 self.setFormat(index, length, format)
-                index = expression.match(text, index + length)
+                index = expression.match(text, index + length).capturedStart()
 
         self.setCurrentBlockState(0)
 
