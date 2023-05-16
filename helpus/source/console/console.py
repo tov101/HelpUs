@@ -182,7 +182,8 @@ class BaseConsole(QtWidgets.QTextEdit):
             self.stdin.write(buffer)
             self.insertText('\n')
             # Store History Command
-            self.command_history.add(buffer)
+            if buffer.count('\n') < 1:
+                self.command_history.add(buffer)
         return True
 
     def _handle_backspace_key(self, event):
