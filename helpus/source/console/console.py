@@ -1,7 +1,6 @@
 import io
 import logging
 import re
-from typing import Callable
 
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import QEvent
@@ -24,7 +23,10 @@ class BaseConsole(QtWidgets.QTextEdit):
 
     CLEAR_SCREEN = 'cls'
 
-    def __init__(self, stream: Callable = None, *args):
+    stream = QtCore.Signal(str)
+    header_printed = QtCore.Signal()
+
+    def __init__(self, *args):
         super(BaseConsole, self).__init__(*args)
         # Vars
         self._current_header = BaseConsole.HOOK_PDB
@@ -36,9 +38,6 @@ class BaseConsole(QtWidgets.QTextEdit):
         self.command_history = CommandHistory(self)
         # HelpUs Buffer
         self.stdin = io.StringIO()
-
-        # Method for stream
-        self.stream = stream
 
         # Event Filter
         self.installEventFilter(self)
@@ -60,6 +59,7 @@ class BaseConsole(QtWidgets.QTextEdit):
         self.setTextColor(QtCore.Qt.GlobalColor.magenta)
         QtWidgets.QTextEdit.insertPlainText(self, self._current_header)
         self._default_position = cursor.position()
+        self.header_printed.emit()
 
     def insertPlainText(self, text: str) -> None:
         # Look for HOOK_PDB even if this comes from recursive debugger
@@ -68,11 +68,11 @@ class BaseConsole(QtWidgets.QTextEdit):
 
         if text == self._current_header:
             self.show_header()
-            self.stream('')
+            self.stream.emit('')
             return
 
         # Stream Data
-        self.stream(text.strip())
+        self.stream.emit(text.strip())
 
         if text.startswith(BaseConsole.HOOK_ERROR):
             self.setTextColor(QtCore.Qt.GlobalColor.red)

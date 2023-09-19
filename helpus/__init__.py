@@ -13,7 +13,7 @@ def not_used(item):
 
 
 # Define Icon Path
-icon_file_path = os.path.join(os.path.dirname(__file__), 'resources', 'ico', 'snake.ico')
+icon_file_path = os.path.join(os.path.dirname(__file__), 'resource', 'ico', 'snake.ico')
 # Define Log File
 helpus_log_file = os.path.join(os.path.dirname("__file__"), 'HelpUs.log')
 

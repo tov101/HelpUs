@@ -12,7 +12,7 @@ class XStream(QtCore.QObject):
     _stderr = None
 
     # messageWritten = ENGINE.QtCore.pyqtSignal(str)
-    messageWritten = QtCore.Signal(str)
+    output = QtCore.Signal(str)
 
     @staticmethod
     def flush():
@@ -24,7 +24,7 @@ class XStream(QtCore.QObject):
 
     def write(self, msg):
         if not self.signalsBlocked():
-            self.messageWritten.emit(msg)
+            self.output.emit(msg)
 
     @staticmethod
     def stdout():

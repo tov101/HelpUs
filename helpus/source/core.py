@@ -7,12 +7,15 @@ import time
 
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtGui import Qt
+from qtpy import uic
 
+from helpus.source.frames import Frames
+from helpus.source.utils.xstream import XStream
 from helpus import icon_file_path
+from helpus.source.buttons import Buttons
 from helpus.version import __version__
 from helpus.source.console.console import BaseConsole
 from helpus.source.utils.remote import RCServer
-from helpus.source.utils.utils import XStream
 
 LOGGER = logging.getLogger('HelpUs')
 
@@ -62,22 +65,23 @@ def setup_breakpoint_hook(
         )
 
     if redirect_streams:
-        sys.stdin.redirect_outerr_stream()
+        sys.stdin.redirect_outerr_fd()
     return __method
 
 
 class HelpUs(QtWidgets.QDialog):
-    BUTTONS = (
-        'Continue',
-        'Next',
-        'Step',
-        'Where',
-        'Up',
-        'Down'
-    )
 
     def __init__(self, parent=None, remote: bool = False, remote_host: str = None, remote_port: int = None):
         super().__init__()
+
+        # Load UI
+        ui_filepath = os.path.normpath(os.path.join(os.path.dirname(__file__), "..\\..\\helpus\\resource\\ui\\main.ui"))
+        uic.loadUi(ui_filepath, self)
+
+        self.setWindowTitle("HelpUs {}".format(__version__))
+        # Set Icon
+        if icon_file_path and os.path.exists(icon_file_path):
+            self.setWindowIcon(QtGui.QIcon(icon_file_path))
 
         # SetParent
         self.parentWidget = QtWidgets.QMainWindow() if not parent else parent
@@ -88,10 +92,6 @@ class HelpUs(QtWidgets.QDialog):
             self.parentWidget.setWindowModality(QtCore.Qt.WindowModality.NonModal)
             self.parentWidget.showNormal()
 
-        # Set Icon
-        if icon_file_path and os.path.exists(icon_file_path):
-            self.setWindowIcon(QtGui.QIcon(icon_file_path))
-
         # Set Flags
         self.setWindowFlags(
             QtCore.Qt.WindowSystemMenuHint |
@@ -99,36 +99,25 @@ class HelpUs(QtWidgets.QDialog):
             QtCore.Qt.WindowCloseButtonHint
         )
 
-        # Resize
-        self.resize(513, 300)
-
-        # Create Layout
-        self.main_layout = QtWidgets.QHBoxLayout()
-        self.setLayout(self.main_layout)
-        self.setWindowTitle("HelpUs {}".format(__version__))
-
-        # Create Content Layouts
-        self.ConsoleLayout = QtWidgets.QVBoxLayout()
-        self.ButtonsLayout = QtWidgets.QVBoxLayout()
-        self.main_layout.addLayout(self.ButtonsLayout)
-        self.main_layout.addLayout(self.ConsoleLayout)
-
         # Create OutputConsole
-        self.console = BaseConsole(self.stream, parent)
-        # self.console.keyPressEvent = self.__key_press_event
-        self.ConsoleLayout.addWidget(self.console)
+        self.console = BaseConsole(parent)
+        self.console.stream.connect(self.__stream)
 
-        # Create buttons
-        for button_text in self.BUTTONS:
-            # Create Button Name
-            button_name = 'button_%s' % button_text.lower()
-            _button = QtWidgets.QPushButton(button_text)
-            _button.setFocusPolicy(Qt.NoFocus)
-            setattr(self, button_name, _button)
-            getattr(self, button_name).clicked.connect(self.__push_button)
+        self.ConsoleLayout = self.te_console.parentWidget().layout()
+        self.ConsoleLayout.replaceWidget(self.te_console, self.console)
+        self.te_console.close()
+        self.te_console.destroy()
+        self.te_console.deleteLater()
 
-            # Add Button to Widget
-            self.ButtonsLayout.addWidget(getattr(self, button_name))
+        # Link Push Buttons
+        self.buttons = Buttons(self)
+        self.buttons.execute.connect(lambda command: self.__execute(command, False))
+
+        # Link Frames Widget
+        self.frames = Frames(self)
+        self.frames.execute.connect(lambda command: self.__execute(command, False))
+        self.console.stream.connect(self.frames.trace)
+        self.console.header_printed.connect(self.frames.update)
 
         # Set Focus on Console
         self.setFocusPolicy(Qt.NoFocus)
@@ -150,25 +139,28 @@ class HelpUs(QtWidgets.QDialog):
 
         self.showNormal()
 
+    def __connect_fd(self, fd, state=True):
+        if state:
+            getattr(XStream, fd)().output.connect(self.console.insertPlainText)
+        else:
+            getattr(XStream, fd)().output.disconnect(self.console.insertPlainText)
+
     def __enable_gui(self, state=True):
         """
 
         :param state:
         :return:
         """
-        self.console.setEnabled(state)
-        for button_text in self.BUTTONS:
-            # Get Button Name
-            button_name = 'button_%s' % button_text.lower()
-            getattr(self, button_name).setEnabled(state)
+        self.setEnabled(state)
         if state:
             self.console.setFocus()
 
-    def __push_button(self):
-        # Read text from Button and use it as pdb keyword
-        button_scope = self.sender().text().lower()
+    def __execute(self, command, rc=False):
         self.console.reset_stdin()
-        self.console.stdin.write(button_scope)
+        self.console.stdin.write(command)
+        if rc:
+            # Write Data into Console also
+            self.console.insertText('RC: {}\n'.format(command))
         self.__enable_gui(False)
 
     def __remote_exchange(self):
@@ -179,15 +171,10 @@ class HelpUs(QtWidgets.QDialog):
                 if data:
                     # Set Event Ready to Go -> Allow queue to store entries and send it back
                     self.__event_ready_to_go.set()
-                    # Write Data into Buffer
-                    self.console.reset_stdin()
-                    self.console.stdin.write(data)
-                    # Write Data into Console also
-                    self.console.insertText('RC: {}\n'.format(data))
-                    self.__enable_gui(False)
+                    self.__execute(command=data, rc=True)
 
                     messages = []
-                    # Wait to have something in queue
+                    # Wait to have something in the queue
                     while self.__send_queue.empty():
                         time.sleep(0.01)
                     while not self.__send_queue.empty():
@@ -201,19 +188,19 @@ class HelpUs(QtWidgets.QDialog):
 
         threading.Thread(name='HelpUs_RemoteReceive', target=__thread_poll, daemon=True).start()
 
-    def stream(self, text: str) -> None:
+    def __stream(self, text: str) -> None:
         # Send Output To RCServer
         if self.__remote and self.__event_ready_to_go.is_set():
             self.__send_queue.put_nowait(item=text)
 
-    def redirect_outerr_stream(self):
+    def redirect_outerr_fd(self):
         """
 
         :return:
         """
         # Link Stream Output
-        XStream.stdout().messageWritten.connect(self.console.insertPlainText)
-        XStream.stderr().messageWritten.connect(self.console.insertPlainText)
+        self.__connect_fd('stdout', True)
+        self.__connect_fd('stderr', True)
 
     def readline(self):
         """
@@ -237,7 +224,7 @@ if __name__ == '__main__':
     p = QtWidgets.QApplication(sys.argv)
     LOGGER.error('Ceva')
 
-    HelpUs().exec_()
+    # HelpUs().exec_()
 
     LOGGER.error = setup_breakpoint_hook(
         parent=None,
