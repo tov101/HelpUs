@@ -1,5 +1,4 @@
 include requirements.txt
 include README.md
 include .pypirc
-recursive-include helpus *.ico
 recursive-include helpus *.py
