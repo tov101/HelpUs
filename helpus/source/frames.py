@@ -2,7 +2,9 @@ import inspect
 import os
 import re
 
-from qtpy import QtCore, QtWidgets
+from PySide6 import QtCore, QtWidgets
+
+from helpus.source.console.console import LOGGER
 
 
 class Frames(QtCore.QObject):
@@ -24,9 +26,9 @@ class Frames(QtCore.QObject):
 
     def __add_object(self, name, value, parent=None):
         if parent:
-            parent = QtWidgets.QTreeWidgetItem(parent, [str(type(value)), name])
+            parent = QtWidgets.QTreeWidgetItem(parent, [type(value).__name__, name])
         else:
-            parent = QtWidgets.QTreeWidgetItem(self._objects, [str(type(value)), name])
+            parent = QtWidgets.QTreeWidgetItem(self._objects, [type(value).__name__, name])
 
         if isinstance(value, list):
             for index, v in enumerate(value):
@@ -46,19 +48,22 @@ class Frames(QtCore.QObject):
         for line in self._trace:
             if not line.strip():
                 continue
-            _frame = re.search(pattern=r"(?i)(?P<filename>\w+[.]py)\((?P<lineno>\d+)\)(?P<function>.*)\(\)", string=line)
+            # TODO: Need to be the relative path to something
+            _frame = re.search(
+                pattern=r"(?i)(?P<filename>\w+[.]py)\((?P<lineno>\d+)\)(?P<function>.*)\(\)", string=line
+            )
             if _frame:
                 filename = _frame.group("filename")
                 lineno = _frame.group("lineno")
                 function = _frame.group("function")
-                current_frame = f"{function}, {os.path.basename(filename)}:{lineno}"
+                current_frame = (function, os.path.basename(filename), lineno)
         return current_frame
 
     def trace(self, text):
         self._trace.append(text)
 
     def update(self):
-        # Keep old stack.
+        # Keep the old stack.
         if self._stack:
             # Clear Frames ListWidget
             self._frames.clear()
@@ -76,9 +81,23 @@ class Frames(QtCore.QObject):
 
         found = False
         for frame in inspect.stack():
-            frame = f"{frame.function}, {os.path.basename(frame.filename)}:{frame.lineno}"
-            if frame == current_frame or found:
-                self._frames.addItem(frame)
+            _frame = f"{frame.function}, {os.path.basename(frame.filename)}:{frame.lineno}"
+            frame_filename = os.path.basename(frame.filename).lower()
+
+            current_function, current_filename, current_lineno = current_frame
+            print(
+                current_filename,
+                frame_filename,
+                f"{frame_filename}c",
+                current_filename.lower() in (frame_filename, f"{frame_filename}c"),
+            )
+            if (
+                current_function.lower() == frame.function.lower()
+                # Maybe be py or may be pyc
+                and current_filename.lower() in (frame_filename, f"{frame_filename}c")
+                and str(current_lineno) == str(frame.lineno)
+            ) or found:
+                self._frames.addItem(_frame)
                 found = True
         self._trace = []
 
@@ -93,7 +112,7 @@ class Frames(QtCore.QObject):
         if self.p_index > index:
             command = "down"
         elif self.p_index < index:
-            command = 'up'
+            command = "up"
 
         if command:
             # Save Stack

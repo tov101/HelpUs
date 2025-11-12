@@ -3,9 +3,9 @@ import struct
 import threading
 import time
 
-LOCALHOST = '127.0.0.1'
+LOCALHOST = "127.0.0.1"
 PORT = 0x2102  # 8450
-ENCODING = 'ascii'
+ENCODING = "ascii"
 
 
 def not_used(item):
@@ -16,7 +16,7 @@ class RCServer(threading.Thread):
     def __init__(self, host=LOCALHOST, port=PORT):
         super(RCServer, self).__init__()
         # Give a name to this thread
-        self.name = 'HelpUs_RemoteServer'
+        self.name = "HelpUs_RemoteServer"
         self.daemon = True
 
         if not host:
@@ -66,7 +66,7 @@ class RCServer(threading.Thread):
 
     def __send(self, connection):
         message = self.__send_data.encode(ENCODING)
-        message = struct.pack('<I', len(message)) + message
+        message = struct.pack("<I", len(message)) + message
         connection.sendall(message)
 
     @staticmethod
@@ -158,7 +158,7 @@ class RCClient:
 
     def send(self, message):
         message = message.encode(ENCODING)
-        message = struct.pack('<I', len(message)) + message
+        message = struct.pack("<I", len(message)) + message
         self.__socket.sendall(message)
 
     def receive(self):
@@ -188,7 +188,7 @@ class RCClient:
         return self.receive()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
 
     if len(sys.argv) > 2:
@@ -198,7 +198,7 @@ if __name__ == '__main__':
             print(x.receive())
             print(x.send(input()))
     else:
-        remote_host = '127.0.0.1'
+        remote_host = "127.0.0.1"
         remote_port = PORT
         x = RCClient()
         while not x.ping():

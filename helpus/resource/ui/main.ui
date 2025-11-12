@@ -13,6 +13,10 @@
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
+  <property name="windowIcon">
+   <iconset resource="../resource.qrc">
+    <normaloff>:/snake.ico</normaloff>:/snake.ico</iconset>
+  </property>
   <layout class="QGridLayout" name="gridLayout_3">
    <item row="0" column="0">
     <widget class="QSplitter" name="splitter_2">
@@ -99,33 +103,33 @@
           </attribute>
           <column>
            <property name="text">
-            <string>&lt;Type&gt;</string>
+            <string>Type</string>
            </property>
            <property name="font">
             <font>
-             <italic>true</italic>
+             <italic>false</italic>
              <bold>true</bold>
             </font>
            </property>
           </column>
           <column>
            <property name="text">
-            <string>&lt;Object&gt;</string>
+            <string>Object</string>
            </property>
            <property name="font">
             <font>
-             <italic>true</italic>
+             <italic>false</italic>
              <bold>true</bold>
             </font>
            </property>
           </column>
           <column>
            <property name="text">
-            <string>&lt;Value&gt;</string>
+            <string>Value</string>
            </property>
            <property name="font">
             <font>
-             <italic>true</italic>
+             <italic>false</italic>
              <bold>true</bold>
             </font>
            </property>
@@ -213,6 +217,8 @@
    </item>
   </layout>
  </widget>
- <resources/>
+ <resources>
+  <include location="../resource.qrc"/>
+ </resources>
  <connections/>
 </ui>

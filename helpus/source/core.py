@@ -1,5 +1,4 @@
 import logging
-import os
 import queue
 import sys
 import threading
@@ -7,17 +6,16 @@ import time
 
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtGui import Qt
-from qtpy import uic
 
-from helpus.source.frames import Frames
-from helpus.source.utils.xstream import XStream
-from helpus import icon_file_path
 from helpus.source.buttons import Buttons
-from helpus.version import __version__
 from helpus.source.console.console import BaseConsole
+from helpus.source.frames import Frames
+from helpus.source.ui.mw import Ui_Dialog
 from helpus.source.utils.remote import RCServer
+from helpus.source.utils.xstream import XStream
+from helpus.version import __version__
 
-LOGGER = logging.getLogger('HelpUs')
+LOGGER = logging.getLogger("HelpUs")
 
 
 def get_qtconsole_object():
@@ -27,13 +25,30 @@ def get_qtconsole_object():
         return HelpUs.console
 
 
+def setup_breakpoint(parent=None, remote: bool = False, remote_host: str = None, remote_port: int = None):
+    # Check and init QApplication
+    instance = QtWidgets.QApplication.instance()
+    if not instance:
+        _ = QtWidgets.QApplication(sys.argv)
+
+    # Init HelpUs
+    if not isinstance(sys.stdin, HelpUs):
+        args = (parent, remote)
+        if remote_host and remote_port:
+            args = (parent, remote, remote_host, remote_port)
+        sys.stdin = HelpUs(*args)
+
+    # Redirect streams
+    sys.stdin.redirect_outerr_fd()
+
+
 def setup_breakpoint_hook(
-        parent,
-        method,
-        redirect_streams: bool = False,
-        remote: bool = False,
-        remote_host: str = None,
-        remote_port: int = None
+    parent,
+    method,
+    redirect_streams: bool = False,
+    remote: bool = False,
+    remote_host: str = None,
+    remote_port: int = None,
 ):
     """
 
@@ -69,19 +84,12 @@ def setup_breakpoint_hook(
     return __method
 
 
-class HelpUs(QtWidgets.QDialog):
-
+class HelpUs(Ui_Dialog, QtWidgets.QDialog):
     def __init__(self, parent=None, remote: bool = False, remote_host: str = None, remote_port: int = None):
         super().__init__()
-
-        # Load UI
-        ui_filepath = os.path.normpath(os.path.join(os.path.dirname(__file__), "..\\..\\helpus\\resource\\ui\\main.ui"))
-        uic.loadUi(ui_filepath, self)
+        self.setupUi(self)
 
         self.setWindowTitle("HelpUs {}".format(__version__))
-        # Set Icon
-        if icon_file_path and os.path.exists(icon_file_path):
-            self.setWindowIcon(QtGui.QIcon(icon_file_path))
 
         # SetParent
         self.parentWidget = QtWidgets.QMainWindow() if not parent else parent
@@ -94,9 +102,7 @@ class HelpUs(QtWidgets.QDialog):
 
         # Set Flags
         self.setWindowFlags(
-            QtCore.Qt.WindowSystemMenuHint |
-            QtCore.Qt.WindowTitleHint |
-            QtCore.Qt.WindowCloseButtonHint
+            QtCore.Qt.WindowSystemMenuHint | QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint
         )
 
         # Create OutputConsole
@@ -120,7 +126,7 @@ class HelpUs(QtWidgets.QDialog):
         self.console.header_printed.connect(self.frames.update)
 
         # Set Focus on Console
-        self.setFocusPolicy(Qt.NoFocus)
+        self.setFocusPolicy(QtGui.Qt.FocusPolicy.NoFocus)
         self.console.setFocus()
 
         # self.__enable_gui(False)
@@ -160,7 +166,7 @@ class HelpUs(QtWidgets.QDialog):
         self.console.stdin.write(command)
         if rc:
             # Write Data into Console also
-            self.console.insertText('RC: {}\n'.format(command))
+            self.console.insertText("RC: {}\n".format(command))
         self.__enable_gui(False)
 
     def __remote_exchange(self):
@@ -182,11 +188,11 @@ class HelpUs(QtWidgets.QDialog):
                         messages.append(__item)
                         # Give some time to fill all the value in queue
                         time.sleep(0.01)
-                    message = ''.join(reversed(messages))
+                    message = "".join(reversed(messages))
                     self.__remote.send(message)
                     self.__event_ready_to_go.clear()
 
-        threading.Thread(name='HelpUs_RemoteReceive', target=__thread_poll, daemon=True).start()
+        threading.Thread(name="HelpUs_RemoteReceive", target=__thread_poll, daemon=True).start()
 
     def __stream(self, text: str) -> None:
         # Send Output To RCServer
@@ -199,8 +205,8 @@ class HelpUs(QtWidgets.QDialog):
         :return:
         """
         # Link Stream Output
-        self.__connect_fd('stdout', True)
-        self.__connect_fd('stderr', True)
+        self.__connect_fd("stdout", True)
+        self.__connect_fd("stderr", True)
 
     def readline(self):
         """
@@ -220,21 +226,16 @@ class HelpUs(QtWidgets.QDialog):
         return value
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     p = QtWidgets.QApplication(sys.argv)
-    LOGGER.error('Ceva')
+    LOGGER.error("Ceva")
 
     # HelpUs().exec_()
 
-    LOGGER.error = setup_breakpoint_hook(
-        parent=None,
-        method=LOGGER.error,
-        redirect_streams=True,
-        remote=True
-    )
+    LOGGER.error = setup_breakpoint_hook(parent=None, method=LOGGER.error, redirect_streams=True, remote=True)
     # LOGGER.error = setup_breakpoint_hook(None, LOGGER.error, redirect_streams=True)
 
     x = 90
-    LOGGER.error('Altceva')
+    LOGGER.error("Altceva")
 
     print(x)

@@ -1,6 +1,9 @@
 import logging.config
 import os
 
+# Ensure QT_API is set early
+os.environ.setdefault("QT_API", "pyside6")
+
 
 # Do not Import Stuff from 'module' here because will raise ImportError because of Circular import
 def not_used(item):
@@ -12,10 +15,8 @@ def not_used(item):
     assert item == item
 
 
-# Define Icon Path
-icon_file_path = os.path.join(os.path.dirname(__file__), 'resource', 'ico', 'snake.ico')
 # Define Log File
-helpus_log_file = os.path.join(os.path.dirname("__file__"), 'HelpUs.log')
+helpus_log_file = os.path.join(os.path.dirname("__file__"), "HelpUs.log")
 
 # CleanUp Existing LogFile
 if os.path.exists(helpus_log_file):
@@ -24,60 +25,48 @@ if os.path.exists(helpus_log_file):
     except Exception as don_t_care:
         not_used(don_t_care)
 
-try:
-    # Try to restore files
-    from stringify import unstringify
+__all__ = ["HelpUs", "get_qtconsole_object", "setup_breakpoint", "setup_breakpoint_hook"]
 
-    from .resources.resources import snake_ico as ico_data
 
-    # Restore Files
-    if not os.path.exists(os.path.dirname(icon_file_path)):
-        os.makedirs(os.path.dirname(icon_file_path))
-    with open(icon_file_path, 'wb+') as fp_w:
-        fp_w.write(
-            unstringify(ico_data)
-        )
-except ImportError as e:
-    print('HelpUs Import Error !0!')
-    pass
+def _lazy_imports():
+    from helpus.source.core import (
+        get_qtconsole_object,
+        HelpUs,
+        setup_breakpoint,
+        setup_breakpoint_hook,
+    )
 
-else:
-    # Module Imports
-    from helpus.source.core import HelpUs, get_qtconsole_object, setup_breakpoint_hook
-
-    # ------------------------------------
-    # Config Logger
-    LOGGING_CONFIGURATION = {
-        'version':                  1,
-        'disable_existing_loggers': False,
-        'formatters':               {
-            'verbose': {'format': '%(name)s[%(levelname)s]: %(message)s'},
-            'simple':  {'format': '%(name)s[%(levelname)s]: %(message)s'}
-        },
-        'handlers':                 {
-            'file': {
-                'level':     'DEBUG',
-                'class':     'logging.handlers.RotatingFileHandler',
-                'filename':  helpus_log_file,
-                'formatter': 'verbose'
-            }
-        },
-        'loggers':                  {
-            'HelpUs': {
-                'handlers':  ['file'],
-                'level':     'DEBUG',
-                'propagate': False
-            }
+    globals().update(
+        {
+            "HelpUs": HelpUs,
+            "get_qtconsole_object": get_qtconsole_object,
+            "setup_breakpoint": setup_breakpoint,
+            "setup_breakpoint_hook": setup_breakpoint_hook,
         }
-    }
-    logging.config.dictConfig(LOGGING_CONFIGURATION)
+    )
 
-    # ------------------------------------
 
-    # Export Visible Items
-    __all__ = [
-        'icon_file_path',
-        'HelpUs',
-        'get_qtconsole_object',
-        'setup_breakpoint_hook',
-    ]
+_lazy_imports()
+
+# ------------------------------------
+# Config Logger
+LOGGING_CONFIGURATION = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {"format": "%(name)s[%(levelname)s]: %(message)s"},
+        "simple": {"format": "%(name)s[%(levelname)s]: %(message)s"},
+    },
+    "handlers": {
+        "file": {
+            "level": "DEBUG",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": helpus_log_file,
+            "formatter": "verbose",
+        }
+    },
+    "loggers": {"HelpUs": {"handlers": ["file"], "level": "DEBUG", "propagate": False}},
+}
+logging.config.dictConfig(LOGGING_CONFIGURATION)
+
+# ------------------------------------

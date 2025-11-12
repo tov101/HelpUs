@@ -11,17 +11,19 @@ from helpus import not_used
 from helpus.source.console.commandhistory import CommandHistory
 from helpus.source.console.syntax import SyntaxHighlighter
 
-LOGGER = logging.getLogger('HelpUs')
+LOGGER = logging.getLogger("HelpUs")
 
 
 class BaseConsole(QtWidgets.QTextEdit):
     HOOK_PDB = "(Pdb) "
-    HOOK_INTERACT = '>>> '
-    HOOK_LINE_BREAK = '... '
-    HOOK_ERROR = '***'
-    HOOKS = [HOOK_PDB, ]
+    HOOK_INTERACT = ">>> "
+    HOOK_LINE_BREAK = "... "
+    HOOK_ERROR = "***"
+    HOOKS = [
+        HOOK_PDB,
+    ]
 
-    CLEAR_SCREEN = 'cls'
+    CLEAR_SCREEN = "cls"
 
     stream = QtCore.Signal(str)
     header_printed = QtCore.Signal()
@@ -31,7 +33,7 @@ class BaseConsole(QtWidgets.QTextEdit):
         # Vars
         self._current_header = BaseConsole.HOOK_PDB
         self._default_position = 0
-        self._tab_chars = ' ' * 4
+        self._tab_chars = " " * 4
 
         # Do not Accept Rich Text
         self.setAcceptRichText(False)
@@ -63,12 +65,12 @@ class BaseConsole(QtWidgets.QTextEdit):
 
     def insertPlainText(self, text: str) -> None:
         # Look for HOOK_PDB even if this comes from recursive debugger
-        _result = re.search(pattern=r'\({1,}Pdb\){1,}\s', string=text)
+        _result = re.search(pattern=r"\({1,}Pdb\){1,}\s", string=text)
         self._current_header = _result.group(0) if _result else BaseConsole.HOOK_PDB
 
         if text == self._current_header:
             self.show_header()
-            self.stream.emit('')
+            self.stream.emit("")
             return
 
         # Stream Data
@@ -76,7 +78,7 @@ class BaseConsole(QtWidgets.QTextEdit):
 
         if text.startswith(BaseConsole.HOOK_ERROR):
             self.setTextColor(QtCore.Qt.GlobalColor.red)
-        elif not text.startswith('RC: ') and text.strip():
+        elif not text.startswith("RC: ") and text.strip():
             self.setTextColor(QtCore.Qt.GlobalColor.black)
         elif text.strip():
             LOGGER.info(text)
@@ -105,19 +107,19 @@ class BaseConsole(QtWidgets.QTextEdit):
 
     def _get_key_event_handlers(self):
         return {
-            Qt.Key_Escape:    self._handle_escape_key,
-            Qt.Key_Return:    self._handle_enter_key,
-            Qt.Key_Enter:     self._handle_enter_key,
+            Qt.Key_Escape: self._handle_escape_key,
+            Qt.Key_Return: self._handle_enter_key,
+            Qt.Key_Enter: self._handle_enter_key,
             Qt.Key_Backspace: self._handle_backspace_key,
-            Qt.Key_Delete:    self._handle_delete_key,
-            Qt.Key_Home:      self._handle_home_key,
-            Qt.Key_Tab:       self._handle_tab_key,
-            Qt.Key_Backtab:   self._handle_backtab_key,
-            Qt.Key_Up:        self._handle_up_key,
-            Qt.Key_Down:      self._handle_down_key,
-            Qt.Key_Left:      self._handle_left_key,
-            Qt.Key_C:         self._handle_c_key,
-            Qt.Key_V:         self._handle_v_key,
+            Qt.Key_Delete: self._handle_delete_key,
+            Qt.Key_Home: self._handle_home_key,
+            Qt.Key_Tab: self._handle_tab_key,
+            Qt.Key_Backtab: self._handle_backtab_key,
+            Qt.Key_Up: self._handle_up_key,
+            Qt.Key_Down: self._handle_down_key,
+            Qt.Key_Left: self._handle_left_key,
+            Qt.Key_C: self._handle_c_key,
+            Qt.Key_V: self._handle_v_key,
         }
 
     def insertFromMimeData(self, mime_data):
@@ -142,8 +144,7 @@ class BaseConsole(QtWidgets.QTextEdit):
         # handled as text insertion. However, on win10 AltGr is reported as
         # Alt+Control which is why we handle this case like regular
         # keypresses, see #53:
-        if not event.modifiers() & Qt.ControlModifier or \
-                event.modifiers() & Qt.AltModifier:
+        if not event.modifiers() & Qt.ControlModifier or event.modifiers() & Qt.AltModifier:
             self._reset_cursor()
 
             if not intercepted and event.text():
@@ -168,11 +169,11 @@ class BaseConsole(QtWidgets.QTextEdit):
         cursor.movePosition(QTextCursor.End)
         self.setTextCursor(cursor)
         if event.modifiers() & Qt.ShiftModifier:
-            self.insertText('\n')
+            self.insertText("\n")
         else:
             # Read Buffer
             buffer = self.input_buffer()
-            # Check if clear screen is needed
+            # Check if a clear screen is needed
             if buffer == BaseConsole.CLEAR_SCREEN:
                 self.clear()
                 self.show_header()
@@ -180,9 +181,9 @@ class BaseConsole(QtWidgets.QTextEdit):
             # Store Input
             self.reset_stdin()
             self.stdin.write(buffer)
-            self.insertText('\n')
+            self.insertText("\n")
             # Store History Command
-            if buffer.count('\n') < 1:
+            if buffer.count("\n") < 1:
                 self.command_history.add(buffer)
         return True
 
@@ -199,21 +200,13 @@ class BaseConsole(QtWidgets.QTextEdit):
             tab = self._tab_chars
             buf = self._get_line_until_cursor()
             if event.modifiers() == Qt.ControlModifier:
-                cursor.movePosition(
-                    QTextCursor.PreviousWord,
-                    QTextCursor.KeepAnchor,
-                    1
-                )
+                cursor.movePosition(QTextCursor.PreviousWord, QTextCursor.KeepAnchor, 1)
                 self._reset_cursor()
             else:
                 # delete spaces to previous tabstop boundary:
                 tabstop = len(buf) % len(tab) == 0
                 num = len(tab) if tabstop and buf.endswith(tab) else 1
-                cursor.movePosition(
-                    QTextCursor.PreviousCharacter,
-                    QTextCursor.KeepAnchor,
-                    num
-                )
+                cursor.movePosition(QTextCursor.PreviousCharacter, QTextCursor.KeepAnchor, num)
         self._remove_selected_input(cursor)
         return True
 
@@ -231,19 +224,13 @@ class BaseConsole(QtWidgets.QTextEdit):
             left = self._get_line_until_cursor()
             right = self._get_line_after_cursor()
             if event.modifiers() == Qt.ControlModifier:
-                cursor.movePosition(
-                    QTextCursor.NextWord,
-                    QTextCursor.KeepAnchor, 1
-                )
+                cursor.movePosition(QTextCursor.NextWord, QTextCursor.KeepAnchor, 1)
                 self._reset_cursor()
             else:
                 # delete spaces to next tabstop boundary:
                 tabstop = len(left) % len(tab) == 0
                 num = len(tab) if tabstop and right.startswith(tab) else 1
-                cursor.movePosition(
-                    QTextCursor.NextCharacter,
-                    QTextCursor.KeepAnchor, num
-                )
+                cursor.movePosition(QTextCursor.NextCharacter, QTextCursor.KeepAnchor, num)
         self._remove_selected_input(cursor)
         return True
 
@@ -275,9 +262,9 @@ class BaseConsole(QtWidgets.QTextEdit):
         tab = self._tab_chars
         pos0 = cursor.selectionStart() - self._default_position
         pos1 = cursor.selectionEnd() - self._default_position
-        line0 = buf[:pos0].count('\n')
-        line1 = buf[:pos1].count('\n')
-        lines = buf.split('\n')
+        line0 = buf[:pos0].count("\n")
+        line1 = buf[:pos1].count("\n")
+        lines = buf.split("\n")
         for i in range(line0, line1 + 1):
             # Although it at first seemed appealing to me to indent to the
             # next tab boundary, this leads to losing relative sub-tab
@@ -287,12 +274,12 @@ class BaseConsole(QtWidgets.QTextEdit):
             if indent:
                 lines[i] = tab + line
             else:
-                lines[i] = line[:len(tab)].lstrip() + line[len(tab):]
+                lines[i] = line[: len(tab)].lstrip() + line[len(tab) :]
             num = len(lines[i]) - len(line)
             pos0 += num if i == line0 else 0
             pos1 += num
         self.clear_input_buffer()
-        self.insertText('\n'.join(lines))
+        self.insertText("\n".join(lines))
         cursor.setPosition(self._default_position + pos0)
         cursor.setPosition(self._default_position + pos1, QTextCursor.KeepAnchor)
         return cursor
@@ -309,7 +296,7 @@ class BaseConsole(QtWidgets.QTextEdit):
 
     def _handle_up_key(self, event):
         shift = event.modifiers() & Qt.ShiftModifier
-        if shift or '\n' in self.input_buffer()[:self.cursor_offset()]:
+        if shift or "\n" in self.input_buffer()[: self.cursor_offset()]:
             self._move_cursor(QTextCursor.Up, select=shift)
         else:
             self.command_history.dec(self.input_buffer())
@@ -317,7 +304,7 @@ class BaseConsole(QtWidgets.QTextEdit):
 
     def _handle_down_key(self, event):
         shift = event.modifiers() & Qt.ShiftModifier
-        if shift or '\n' in self.input_buffer()[self.cursor_offset():]:
+        if shift or "\n" in self.input_buffer()[self.cursor_offset() :]:
             self._move_cursor(QTextCursor.Down, select=shift)
         else:
             self.command_history.inc()
@@ -339,10 +326,7 @@ class BaseConsole(QtWidgets.QTextEdit):
         return intercepted
 
     def _handle_v_key(self, event):
-        if (
-                event.modifiers() == Qt.ControlModifier
-                or event.modifiers() == Qt.ControlModifier | Qt.ShiftModifier
-        ):
+        if event.modifiers() == Qt.ControlModifier or event.modifiers() == Qt.ControlModifier | Qt.ShiftModifier:
             clipboard = QApplication.clipboard()
             mime_data = clipboard.mimeData(QClipboard.Clipboard)
             self.insertFromMimeData(mime_data)
@@ -360,7 +344,7 @@ class BaseConsole(QtWidgets.QTextEdit):
 
     def input_buffer(self):
         """Retrieve current input buffer in string form."""
-        text = self.toPlainText()[self._default_position:]
+        text = self.toPlainText()[self._default_position :]
         return text
 
     def clear_input_buffer(self):
@@ -395,11 +379,11 @@ class BaseConsole(QtWidgets.QTextEdit):
 
     def _get_line_until_cursor(self):
         """Get current line of input buffer, up to cursor position."""
-        return self.input_buffer()[:self.cursor_offset()].rsplit('\n', 1)[-1]
+        return self.input_buffer()[: self.cursor_offset()].rsplit("\n", 1)[-1]
 
     def _get_line_after_cursor(self):
         """Get current line of input buffer, after cursor position."""
-        return self.input_buffer()[self.cursor_offset():].split('\n', 1)[0]
+        return self.input_buffer()[self.cursor_offset() :].split("\n", 1)[0]
 
     def _remove_selected_input(self, cursor):
         not_used(self)

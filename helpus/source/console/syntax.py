@@ -1,20 +1,16 @@
-from PySide6 import (
-    QtCore,
-    QtGui
-)
+from PySide6 import QtCore, QtGui
 
 
-def format(color, style=''):
-    """Return a QTextCharFormat with the given attributes.
-    """
+def format(color, style=""):
+    """Return a QTextCharFormat with the given attributes."""
     _color = QtGui.QColor()
     _color.setNamedColor(color)
 
     _format = QtGui.QTextCharFormat()
     _format.setForeground(_color)
-    if 'bold' in style:
+    if "bold" in style:
         _format.setFontWeight(QtGui.QFont.Bold)
-    if 'italic' in style:
+    if "italic" in style:
         _format.setFontItalic(True)
 
     return _format
@@ -23,87 +19,132 @@ def format(color, style=''):
 # Syntax styles that can be shared by all languages
 STYLES = {
     # Python Keywords
-    'keyword':            format('blue', 'bold'),
-    'operator':           format('red'),
-    'brace':              format('darkGray'),
-    'defclass':           format('black', 'bold'),
-    'string':             format('magenta'),
-    'string2':            format('darkMagenta'),
-    'comment':            format('green', 'italic'),
-    'self':               format('darkMagenta'),
-    'numbers':            format('brown'),
+    "keyword": format("blue", "bold"),
+    "operator": format("red"),
+    "brace": format("darkGray"),
+    "defclass": format("black", "bold"),
+    "string": format("magenta"),
+    "string2": format("darkMagenta"),
+    "comment": format("green", "italic"),
+    "self": format("darkMagenta"),
+    "numbers": format("brown"),
     # Evaluate Keywords
-    'conditions':         format('magenta'),
-    'triggers':           format('blue', 'bold'),
-    'evaluators':         format('blue', 'bold'),
-    'functions':          format('magenta', 'bold'),
-    'hardcoded_triggers': format('darkGray', 'italic'),
-    'e_operator':         format('blue')
+    "conditions": format("magenta"),
+    "triggers": format("blue", "bold"),
+    "evaluators": format("blue", "bold"),
+    "functions": format("magenta", "bold"),
+    "hardcoded_triggers": format("darkGray", "italic"),
+    "e_operator": format("blue"),
 }
 
 
 class PythonSyntax:
     # Python keywords
     keywords = [
-        'and', 'assert', 'break', 'class', 'continue', 'def',
-        'del', 'elif', 'else', 'except', 'exec', 'finally',
-        'for', 'from', 'global', 'if', 'import', 'in',
-        'is', 'lambda', 'not', 'or', 'pass', 'print',
-        'raise', 'return', 'try', 'while', 'yield',
-        'None', 'True', 'False', 'as',
+        "and",
+        "assert",
+        "break",
+        "class",
+        "continue",
+        "def",
+        "del",
+        "elif",
+        "else",
+        "except",
+        "exec",
+        "finally",
+        "for",
+        "from",
+        "global",
+        "if",
+        "import",
+        "in",
+        "is",
+        "lambda",
+        "not",
+        "or",
+        "pass",
+        "print",
+        "raise",
+        "return",
+        "try",
+        "while",
+        "yield",
+        "None",
+        "True",
+        "False",
+        "as",
     ]
 
     # Python operators
     operators = [
-        '=',
+        "=",
         # Comparison
-        '==', '!=', '<', '<=', '>', '>=',
+        "==",
+        "!=",
+        "<",
+        "<=",
+        ">",
+        ">=",
         # Arithmetic
-        '\+', '-', '\*', '/', '//', '\%', '\*\*',
+        "\+",
+        "-",
+        "\*",
+        "/",
+        "//",
+        "\%",
+        "\*\*",
         # In-place
-        '\+=', '-=', '\*=', '/=', '\%=',
+        "\+=",
+        "-=",
+        "\*=",
+        "/=",
+        "\%=",
         # Bitwise
-        '\^', '\|', '\&', '\~', '>>', '<<',
+        "\^",
+        "\|",
+        "\&",
+        "\~",
+        ">>",
+        "<<",
     ]
 
     # Python braces
     braces = [
-        '\{', '\}', '\(', '\)', '\[', '\]',
+        "\{",
+        "\}",
+        "\(",
+        "\)",
+        "\[",
+        "\]",
     ]
 
     def __init__(self):
         self._rules = []
 
         # Keyword, operator, and brace rules
-        self._rules += [(r'\b%s\b' % w, 0, STYLES['keyword'])
-                        for w in PythonSyntax.keywords]
-        self._rules += [(r'%s' % o, 0, STYLES['operator'])
-                        for o in PythonSyntax.operators]
-        self._rules += [(r'%s' % b, 0, STYLES['brace'])
-                        for b in PythonSyntax.braces]
+        self._rules += [(r"\b%s\b" % w, 0, STYLES["keyword"]) for w in PythonSyntax.keywords]
+        self._rules += [(r"%s" % o, 0, STYLES["operator"]) for o in PythonSyntax.operators]
+        self._rules += [(r"%s" % b, 0, STYLES["brace"]) for b in PythonSyntax.braces]
 
         # All other rules
         self._rules += [
             # 'self'
-            (r'\bself\b', 0, STYLES['self']),
-
+            (r"\bself\b", 0, STYLES["self"]),
             # 'def' followed by an identifier
-            (r'\bdef\b\s*(\w+)', 1, STYLES['defclass']),
+            (r"\bdef\b\s*(\w+)", 1, STYLES["defclass"]),
             # 'class' followed by an identifier
-            (r'\bclass\b\s*(\w+)', 1, STYLES['defclass']),
-
+            (r"\bclass\b\s*(\w+)", 1, STYLES["defclass"]),
             # Numeric literals
-            (r'\b[+-]?[0-9]+[lL]?\b', 0, STYLES['numbers']),
-            (r'\b[+-]?0[xX][0-9A-Fa-f]+[lL]?\b', 0, STYLES['numbers']),
-            (r'\b[+-]?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\b', 0, STYLES['numbers']),
-
+            (r"\b[+-]?[0-9]+[lL]?\b", 0, STYLES["numbers"]),
+            (r"\b[+-]?0[xX][0-9A-Fa-f]+[lL]?\b", 0, STYLES["numbers"]),
+            (r"\b[+-]?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\b", 0, STYLES["numbers"]),
             # Double-quoted string, possibly containing escape sequences
-            (r'"[^"\\]*(\\.[^"\\]*)*"', 0, STYLES['string']),
+            (r'"[^"\\]*(\\.[^"\\]*)*"', 0, STYLES["string"]),
             # Single-quoted string, possibly containing escape sequences
-            (r"'[^'\\]*(\\.[^'\\]*)*'", 0, STYLES['string']),
-
+            (r"'[^'\\]*(\\.[^'\\]*)*'", 0, STYLES["string"]),
             # From '#' until a newline
-            (r'#[^\n]*', 0, STYLES['comment']),
+            (r"#[^\n]*", 0, STYLES["comment"]),
         ]
 
     def __iter__(self):
@@ -111,25 +152,23 @@ class PythonSyntax:
 
 
 class SyntaxHighlighter(QtGui.QSyntaxHighlighter):
-    """Syntax highlighter for the Python language.
-    """
-    SYNTAX_PYTHON = 'python'
-    SYNTAX_EVALUATE = 'evaluate'
+    """Syntax highlighter for the Python language."""
+
+    SYNTAX_PYTHON = "python"
+    SYNTAX_EVALUATE = "evaluate"
 
     def __init__(self, parent: QtGui.QTextDocument) -> None:
         super().__init__(parent)
 
         # Multi-line strings (expression, flag, style)
-        self.tri_single = (QtCore.QRegularExpression("'''"), 1, STYLES['string2'])
-        self.tri_double = (QtCore.QRegularExpression('"""'), 2, STYLES['string2'])
+        self.tri_single = (QtCore.QRegularExpression("'''"), 1, STYLES["string2"])
+        self.tri_double = (QtCore.QRegularExpression('"""'), 2, STYLES["string2"])
 
         # All other rules
-        self.rules = [(QtCore.QRegularExpression(pat), index, fmt)
-                      for (pat, index, fmt) in PythonSyntax()]
+        self.rules = [(QtCore.QRegularExpression(pat), index, fmt) for (pat, index, fmt) in PythonSyntax()]
 
     def highlightBlock(self, text):
-        """Apply syntax highlighting to the given block of text.
-        """
+        """Apply syntax highlighting to the given block of text."""
         self.tripleQuoutesWithinStrings = []
         # Do other syntax formatting
         for expression, nth, format in self.rules:
