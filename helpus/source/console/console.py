@@ -79,7 +79,7 @@ class BaseConsole(QtWidgets.QTextEdit):
         if text.startswith(BaseConsole.HOOK_ERROR):
             self.setTextColor(QtCore.Qt.GlobalColor.red)
         elif not text.startswith("RC: ") and text.strip():
-            self.setTextColor(QtCore.Qt.GlobalColor.black)
+            self.setTextColor(QtCore.Qt.GlobalColor.gray)
         elif text.strip():
             LOGGER.info(text)
             self.setTextColor(QtCore.Qt.GlobalColor.magenta)

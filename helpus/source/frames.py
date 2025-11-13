@@ -85,12 +85,6 @@ class Frames(QtCore.QObject):
             frame_filename = os.path.basename(frame.filename).lower()
 
             current_function, current_filename, current_lineno = current_frame
-            print(
-                current_filename,
-                frame_filename,
-                f"{frame_filename}c",
-                current_filename.lower() in (frame_filename, f"{frame_filename}c"),
-            )
             if (
                 current_function.lower() == frame.function.lower()
                 # Maybe be py or may be pyc
