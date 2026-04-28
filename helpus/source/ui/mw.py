@@ -51,6 +51,7 @@ class Ui_Dialog(object):
         self.toolbar.setObjectName("toolbar")
         self.toolbar.setFrameShape(QFrame.StyledPanel)
         self.toolbar.setFrameShadow(QFrame.Raised)
+        self.toolbar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.toolbarLayout = QHBoxLayout(self.toolbar)
         self.toolbarLayout.setContentsMargins(6, 3, 6, 3)
         self.toolbarLayout.setSpacing(6)
@@ -66,7 +67,7 @@ class Ui_Dialog(object):
             self.toolbarLayout.addWidget(btn)
 
         self.toolbarLayout.addStretch()
-        self.rootLayout.addWidget(self.toolbar)
+        self.rootLayout.addWidget(self.toolbar, 0)   # no stretch
 
         # ── Three-column splitter ─────────────────────────────────────
         self.splitter = QSplitter(Qt.Horizontal, Dialog)
@@ -111,7 +112,7 @@ class Ui_Dialog(object):
         self.splitter.setStretchFactor(0, 2)
         self.splitter.setStretchFactor(1, 5)
         self.splitter.setStretchFactor(2, 3)
-        self.rootLayout.addWidget(self.splitter)
+        self.rootLayout.addWidget(self.splitter, 1)   # takes all remaining space
 
         self.retranslateUi(Dialog)
         QMetaObject.connectSlotsByName(Dialog)
