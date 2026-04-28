@@ -9,7 +9,7 @@ ENCODING = "ascii"
 
 
 def not_used(item):
-    assert item == item
+    pass
 
 
 class RCServer(threading.Thread):
@@ -127,6 +127,9 @@ class RCClient:
     def __init__(self):
         self.__socket = None
 
+    def __enter__(self):
+        return self
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
@@ -153,8 +156,9 @@ class RCClient:
             return False
 
     def close(self):
-        self.__socket.close()
-        self.__socket = None
+        if self.__socket:
+            self.__socket.close()
+            self.__socket = None
 
     def send(self, message):
         message = message.encode(ENCODING)

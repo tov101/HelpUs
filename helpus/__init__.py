@@ -7,16 +7,12 @@ os.environ.setdefault("QT_API", "pyside6")
 
 # Do not Import Stuff from 'module' here because will raise ImportError because of Circular import
 def not_used(item):
-    """
-    Just to make PyLint happy.
-    :param item:
-    :return:
-    """
-    assert item == item
+    """Suppress linter warnings for intentionally unused variables."""
+    pass
 
 
 # Define Log File
-helpus_log_file = os.path.join(os.path.dirname("__file__"), "HelpUs.log")
+helpus_log_file = os.path.join(os.path.dirname(__file__), "HelpUs.log")
 
 # CleanUp Existing LogFile
 if os.path.exists(helpus_log_file):

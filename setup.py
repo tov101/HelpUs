@@ -5,7 +5,7 @@ import os
 import sys
 
 # Always prefer setuptools over distutils
-from setuptools import setup
+from setuptools import setup, find_packages
 
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(here, "helpus"))
@@ -36,7 +36,7 @@ def read_version():
 
 __version__ = read_version()
 
-data = [os.path.join(here, "helpus\\resources")]
+data = [os.path.join(here, "helpus", "resource")]
 
 setup(
     name="helpus",
@@ -75,7 +75,7 @@ setup(
     keywords="HelpUs -> BreakPoint In Execution Module",
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
-    packages=["helpus"],
+    packages=find_packages(),
     # Alternatively, if you want to distribute just a my_module.py, uncomment
     # this:
     #   py_modules=["my_module"],
@@ -92,7 +92,7 @@ setup(
     # If there are data files included in your packages that need to be
     # installed, specify them here.  If using Python 2.6 or less, then these
     # have to be included in MANIFEST.in as well.
-    package_data={"HelpUs": data},
+    package_data={"helpus": ["resource/**/*", "resource/ico/*", "resource/ui/*"]},
     include_package_data=True,
     # Although 'package_data' is the preferred approach, in some case you may
     # need to place data files outside of your packages. See:

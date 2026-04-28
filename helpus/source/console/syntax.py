@@ -379,7 +379,7 @@ class PythonSyntax:
 
     def set_theme(self, theme="dark"):
         # Keywords, operators, braces
-        self._rules += [(r"\b%s\b" % w, 0, STYLES[theme]["keyword"]) for w in PythonSyntax.keywords]
+        self._rules = [(r"\b%s\b" % w, 0, STYLES[theme]["keyword"]) for w in PythonSyntax.keywords]
         self._rules += [(r"%s" % o, 0, STYLES[theme]["operator"]) for o in PythonSyntax.operators]
         self._rules += [(r"%s" % b, 0, STYLES[theme]["brace"]) for b in PythonSyntax.braces]
 

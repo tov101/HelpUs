@@ -4,7 +4,7 @@ from PySide6 import QtCore
 
 
 def not_used(item):
-    assert item == item
+    pass
 
 
 class XStream(QtCore.QObject):

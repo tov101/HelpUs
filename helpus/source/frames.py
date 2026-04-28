@@ -34,7 +34,7 @@ class Frames(QtCore.QObject):
             for index, v in enumerate(value):
                 self.__add_object(parent=parent, name=index, value=v)
         elif isinstance(value, dict):
-            for k, v in enumerate(value):
+            for k, v in value.items():
                 self.__add_object(parent=parent, name=k, value=v)
         elif isinstance(value, set):
             for index, v in enumerate(value):
@@ -116,9 +116,10 @@ class Frames(QtCore.QObject):
                 self.__request(command)
 
         frame = None
-        for frame in inspect.stack():
-            frame_description = f"{frame.function}, {os.path.basename(frame.filename)}:{frame.lineno}"
+        for f in inspect.stack():
+            frame_description = f"{f.function}, {os.path.basename(f.filename)}:{f.lineno}"
             if frame_description == current_item.text():
+                frame = f
                 break
 
         if not frame:

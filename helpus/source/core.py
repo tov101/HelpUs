@@ -21,8 +21,9 @@ LOGGER = logging.getLogger("HelpUs")
 def get_qtconsole_object():
     if isinstance(sys.stdin, HelpUs):
         return sys.stdin.console
-    else:
-        return HelpUs.console
+    raise RuntimeError(
+        "HelpUs console is not initialized. Call setup_breakpoint() first."
+    )
 
 
 def setup_breakpoint(parent=None, remote: bool = False, remote_host: str = None, remote_port: int = None):
@@ -76,7 +77,7 @@ def setup_breakpoint_hook(
         sys.stdout = sys.__stdout__
         sys.stderr = sys.__stderr__
         raise Exception(
-            "Multiple Instances are not allowed. Can be possible, but I'm to lazy to go deep with development."
+            "Multiple Instances are not allowed. Can be possible, but I'm too lazy to go deep with development."
         )
 
     if redirect_streams:
@@ -133,7 +134,7 @@ class HelpUs(Ui_Dialog, QtWidgets.QDialog):
 
         # RC Server
         self.__remote = None
-        self.__send_queue = queue.PriorityQueue()
+        self.__send_queue = queue.Queue()
         self.__event_ready_to_go = threading.Event()
         if remote:
             args = tuple()
@@ -188,7 +189,7 @@ class HelpUs(Ui_Dialog, QtWidgets.QDialog):
                         messages.append(__item)
                         # Give some time to fill all the value in queue
                         time.sleep(0.01)
-                    message = "".join(reversed(messages))
+                    message = "".join(messages)
                     self.__remote.send(message)
                     self.__event_ready_to_go.clear()
 

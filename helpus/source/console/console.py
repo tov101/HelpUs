@@ -73,8 +73,8 @@ class BaseConsole(QtWidgets.QTextEdit):
             self.stream.emit("")
             return
 
-        # Stream Data
-        self.stream.emit(text.strip())
+        # Stream Data — emit raw text (not stripped) to preserve formatting for remote transport
+        self.stream.emit(text)
 
         if text.startswith(BaseConsole.HOOK_ERROR):
             self.setTextColor(QtCore.Qt.GlobalColor.red)
@@ -312,11 +312,12 @@ class BaseConsole(QtWidgets.QTextEdit):
 
     def _handle_left_key(self, _event):
         """
-        Move cursor to left but no more than self._default_position
+        Move cursor to left but no more than self._default_position.
+        Return True to intercept (block) the event when already at the minimum position.
         :param _event:
         :return:
         """
-        return self.cursor_offset() > self._default_position
+        return self.cursor_offset() <= 0
 
     def _handle_c_key(self, event):
         intercepted = False
