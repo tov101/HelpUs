@@ -54,9 +54,8 @@ class BaseConsole(QtWidgets.QTextEdit):
         self.setFocus()
 
         SyntaxHighlighter(self.document())
-        # Completer — must be created AFTER installEventFilter so QCompleter's
-        # internal filter (installed via setWidget) is registered last and
-        # therefore runs first (Qt LIFO event-filter order).
+        # Completer must be created after installEventFilter; the popup uses
+        # Qt.ToolTip so it never steals focus from the editor.
         self.completer = PdbCompleter(self)
 
     def show_header(self):
@@ -124,6 +123,7 @@ class BaseConsole(QtWidgets.QTextEdit):
             Qt.Key_Down: self._handle_down_key,
             Qt.Key_Left: self._handle_left_key,
             Qt.Key_Space: self._handle_space_key,
+            Qt.Key_A: self._handle_a_key,
             Qt.Key_C: self._handle_c_key,
             Qt.Key_V: self._handle_v_key,
         }
@@ -315,8 +315,8 @@ class BaseConsole(QtWidgets.QTextEdit):
 
     def _handle_up_key(self, event):
         if self.completer.is_popup_visible():
-            # QCompleter's event filter (LIFO: runs before ours) already handled this.
-            return False
+            self.completer.select_prev()
+            return True
         shift = event.modifiers() & Qt.ShiftModifier
         if shift or "\n" in self.input_buffer()[: self.cursor_offset()]:
             self._move_cursor(QTextCursor.Up, select=shift)
@@ -326,8 +326,8 @@ class BaseConsole(QtWidgets.QTextEdit):
 
     def _handle_down_key(self, event):
         if self.completer.is_popup_visible():
-            # QCompleter's event filter (LIFO: runs before ours) already handled this.
-            return False
+            self.completer.select_next()
+            return True
         shift = event.modifiers() & Qt.ShiftModifier
         if shift or "\n" in self.input_buffer()[self.cursor_offset() :]:
             self._move_cursor(QTextCursor.Down, select=shift)
@@ -348,6 +348,13 @@ class BaseConsole(QtWidgets.QTextEdit):
         """Ctrl+Space triggers explicit completion; plain Space falls through."""
         if event.modifiers() & Qt.ControlModifier:
             self.completer.trigger()
+            return True
+        return False
+
+    def _handle_a_key(self, event):
+        """Ctrl+A selects all text in the console (entire history + input)."""
+        if event.modifiers() == Qt.ControlModifier:
+            self.selectAll()
             return True
         return False
 

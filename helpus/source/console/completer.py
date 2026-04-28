@@ -5,6 +5,9 @@ Autocompleter for the PDB console.
 Provides Tab / Ctrl+Space completion using:
   - Python keywords and builtins (static list from PythonSyntax)
   - Names from the active Pdb frame's locals and globals (live, via pdb.Pdb.curframe_locals)
+
+Uses a plain QListWidget tooltip-popup to avoid the focus-stealing and coordinate
+mapping issues that QCompleter has when combined with QTextEdit.
 """
 
 import inspect
@@ -13,28 +16,65 @@ import re
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QTextCursor
-from PySide6.QtCore import QStringListModel
-from PySide6.QtWidgets import QCompleter, QScrollBar
 
 from helpus.source.console.syntax import PythonSyntax
 
 
+class _CompletionPopup(QtWidgets.QListWidget):
+    """Borderless floating list used as the completion dropdown.
+
+    Uses Qt.ToolTip window flag so it never steals keyboard focus from the
+    text editor — all key events continue to arrive at the editor widget.
+    """
+
+    item_accepted = QtCore.Signal(str)
+
+    def __init__(self):
+        super().__init__(None)
+        self.setWindowFlags(Qt.ToolTip)
+        self.setFocusPolicy(Qt.NoFocus)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setMouseTracking(True)
+        self.itemClicked.connect(lambda item: self.item_accepted.emit(item.text()))
+
+    def populate(self, candidates: list) -> None:
+        self.clear()
+        for c in candidates:
+            self.addItem(c)
+        if self.count():
+            self.setCurrentRow(0)
+        # Resize to content (capped at 8 visible rows)
+        rows = min(self.count(), 8)
+        row_h = self.sizeHintForRow(0) if self.count() else 20
+        col_w = self.sizeHintForColumn(0) + 24
+        self.setFixedSize(max(col_w, 120), rows * row_h + 4)
+
+    def select_next(self) -> None:
+        row = self.currentRow()
+        if row < self.count() - 1:
+            self.setCurrentRow(row + 1)
+
+    def select_prev(self) -> None:
+        row = self.currentRow()
+        if row > 0:
+            self.setCurrentRow(row - 1)
+
+    def current_text(self) -> str:
+        item = self.currentItem()
+        return item.text() if item else ""
+
+
 class PdbCompleter(QtCore.QObject):
-    """Autocompletion overlay for a BaseConsole widget."""
+    """Autocompletion controller for a BaseConsole widget."""
 
     _STATIC_NAMES = sorted(set(PythonSyntax.keywords) | set(PythonSyntax.builtins))
 
     def __init__(self, console):
         super().__init__(console)
         self._console = console
-
-        self._model = QStringListModel(self)
-        self._completer = QCompleter(self)
-        self._completer.setModel(self._model)
-        self._completer.setWidget(console)
-        self._completer.setCaseSensitivity(Qt.CaseSensitive)
-        self._completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
-        self._completer.activated.connect(self._insert_completion)
+        self._popup = _CompletionPopup()
+        self._popup.item_accepted.connect(self._insert_completion)
+        self._prefix = ""
 
     # ------------------------------------------------------------------
     # Public API
@@ -43,7 +83,7 @@ class PdbCompleter(QtCore.QObject):
     def trigger(self) -> bool:
         """Trigger completion at the current cursor position.
 
-        Returns True if the popup was shown or a single match was inserted.
+        Returns True if a popup was shown or a single match was inserted directly.
         """
         if not self._console.isEnabled():
             return False
@@ -53,58 +93,58 @@ class PdbCompleter(QtCore.QObject):
         candidates = self._get_candidates(prefix)
         if not candidates:
             return False
+        self._prefix = prefix
         if len(candidates) == 1:
             self._insert_completion(candidates[0])
             return True
-        self._model.setStringList(candidates)
-        self._completer.setCompletionPrefix(prefix)
-        popup = self._completer.popup()
-        popup.setCurrentIndex(self._completer.completionModel().index(0, 0))
-        rect = self._console.cursorRect()
-        rect.setWidth(
-            popup.sizeHintForColumn(0)
-            + popup.verticalScrollBar().sizeHint().width()
-        )
-        self._completer.complete(rect)
+        self._popup.populate(candidates)
+        # cursorRect() is in viewport coordinates; map to global for a top-level popup
+        cursor_rect = self._console.cursorRect()
+        global_pos = self._console.viewport().mapToGlobal(cursor_rect.bottomLeft())
+        self._popup.move(global_pos)
+        self._popup.show()
         return True
 
     def update_prefix(self) -> None:
         """Re-filter the visible popup after the user types or deletes a character."""
-        if not self._completer.popup().isVisible():
+        if not self._popup.isVisible():
             return
         prefix = self._get_prefix()
         if not prefix:
-            self._completer.popup().hide()
+            self._popup.hide()
             return
-        self._completer.setCompletionPrefix(prefix)
-        if self._completer.completionCount() == 0:
-            self._completer.popup().hide()
-        else:
-            self._completer.popup().setCurrentIndex(
-                self._completer.completionModel().index(0, 0)
-            )
+        candidates = self._get_candidates(prefix)
+        if not candidates:
+            self._popup.hide()
+            return
+        self._prefix = prefix
+        self._popup.populate(candidates)
 
     def accept_current(self) -> bool:
         """Insert the currently highlighted popup item.
 
-        Returns True if an item was accepted, False if popup was not visible.
+        Returns True if an item was accepted, False if the popup was not visible.
         """
-        popup = self._completer.popup()
-        if not popup.isVisible():
+        if not self._popup.isVisible():
             return False
-        idx = popup.currentIndex()
-        if not idx.isValid():
-            idx = self._completer.completionModel().index(0, 0)
-        if idx.isValid():
-            self._insert_completion(self._completer.completionModel().data(idx))
-        popup.hide()
+        text = self._popup.current_text()
+        if text:
+            self._insert_completion(text)
+        else:
+            self._popup.hide()
         return True
 
+    def select_next(self) -> None:
+        self._popup.select_next()
+
+    def select_prev(self) -> None:
+        self._popup.select_prev()
+
     def is_popup_visible(self) -> bool:
-        return self._completer.popup().isVisible()
+        return self._popup.isVisible()
 
     def hide_popup(self) -> None:
-        self._completer.popup().hide()
+        self._popup.hide()
 
     # ------------------------------------------------------------------
     # Internals
@@ -139,9 +179,10 @@ class PdbCompleter(QtCore.QObject):
         return [], []
 
     def _insert_completion(self, completion: str) -> None:
-        prefix = self._get_prefix()
+        prefix = self._prefix or self._get_prefix()
         cursor = self._console.textCursor()
         cursor.movePosition(QTextCursor.Left, QTextCursor.KeepAnchor, len(prefix))
         self._console.setTextCursor(cursor)
         self._console.insertText(completion)
-        self._completer.popup().hide()
+        self._popup.hide()
+        self._prefix = ""
