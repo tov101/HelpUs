@@ -13,7 +13,8 @@ import re
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QTextCursor
-from PySide6.QtWidgets import QCompleter, QScrollBar, QStringListModel
+from PySide6.QtCore import QStringListModel
+from PySide6.QtWidgets import QCompleter, QScrollBar
 
 from helpus.source.console.syntax import PythonSyntax
 
