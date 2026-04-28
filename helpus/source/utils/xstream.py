@@ -1,6 +1,6 @@
 import sys
 
-from PySide6 import QtCore
+from qtpy import QtCore
 
 
 def not_used(item):

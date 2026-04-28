@@ -18,9 +18,9 @@ so it never steals focus and needs no coordinate-space mapping.
 import inspect
 import re
 
-from PySide6 import QtCore, QtWidgets
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QTextCursor
+from qtpy import QtCore, QtWidgets
+from qtpy.QtCore import Qt
+from qtpy.QtGui import QTextCursor
 
 from helpus.source.console.syntax import PythonSyntax
 

@@ -2,10 +2,11 @@ import io
 import logging
 import re
 
-from PySide6 import QtCore, QtWidgets
-from PySide6.QtCore import QEvent
-from PySide6.QtGui import QClipboard, QFont, QFontDatabase, Qt, QTextCursor
-from PySide6.QtWidgets import QApplication
+from qtpy import QtCore, QtWidgets
+from qtpy.QtCore import QEvent
+from qtpy.QtCore import Qt
+from qtpy.QtGui import QClipboard, QFont, QFontDatabase, QTextCursor
+from qtpy.QtWidgets import QApplication
 
 from helpus import not_used
 from helpus.source.console.commandhistory import CommandHistory
@@ -26,12 +27,19 @@ _PREFERRED_FONTS = [
 ]
 
 
+# QFontDatabase.FixedFont (Qt 5) vs QFontDatabase.SystemFont.FixedFont (Qt 6).
+try:
+    _FIXED_FONT_ENUM = QFontDatabase.SystemFont.FixedFont
+except AttributeError:
+    _FIXED_FONT_ENUM = QFontDatabase.FixedFont  # type: ignore[attr-defined]
+
+
 def _console_font(size: int = 10) -> QFont:
     available = set(QFontDatabase.families())
     for name in _PREFERRED_FONTS:
         if name in available:
             return QFont(name, size)
-    font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+    font = QFontDatabase.systemFont(_FIXED_FONT_ENUM)
     font.setPointSize(size)
     return font
 

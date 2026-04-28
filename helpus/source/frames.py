@@ -2,7 +2,7 @@ import inspect
 import os
 import re
 
-from PySide6 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 
 from helpus.source.console.console import LOGGER
 

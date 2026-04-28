@@ -4,8 +4,8 @@ import sys
 import threading
 import time
 
-from PySide6 import QtCore, QtGui, QtWidgets
-from PySide6.QtGui import Qt
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import Qt
 
 from helpus.source.buttons import Buttons
 from helpus.source.console.console import BaseConsole
