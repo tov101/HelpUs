@@ -26,12 +26,15 @@ from helpus.source.console.syntax import PythonSyntax
 
 
 class _CompletionPopup(QtWidgets.QListWidget):
-    """Completion dropdown rendered directly inside the console's viewport."""
+    """Completion dropdown — floating window that never steals focus."""
 
     item_accepted = QtCore.Signal(str)
 
     def __init__(self, console):
-        super().__init__(console.viewport())
+        # No parent → top-level window; WA_ShowWithoutActivating keeps focus in editor.
+        super().__init__(None)
+        self.setWindowFlags(Qt.Tool | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
+        self.setAttribute(Qt.WA_ShowWithoutActivating, True)
         self.setFocusPolicy(Qt.NoFocus)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setMouseTracking(True)
@@ -88,7 +91,7 @@ class PdbCompleter(QtCore.QObject):
     def trigger(self) -> bool:
         """Trigger completion at the current cursor position.
 
-        Returns True if a popup was shown or a single match was inserted.
+        Returns True if a popup was shown (even with one item).
         """
         if not self._console.isEnabled():
             return False
@@ -99,9 +102,6 @@ class PdbCompleter(QtCore.QObject):
         if not candidates:
             return False
         self._prefix = prefix
-        if len(candidates) == 1:
-            self._insert_completion(candidates[0])
-            return True
         self._popup.populate(candidates)
         self._show_popup()
         return True
@@ -135,16 +135,12 @@ class PdbCompleter(QtCore.QObject):
         prefix = self._get_prefix()
         if not prefix:
             return
-        # Always trigger on dotted access; trigger plain names after threshold.
         if "." in prefix or (ch not in (".", "") and len(prefix) >= self.AUTO_TRIGGER_MIN):
             candidates = self._get_candidates(prefix)
             if candidates:
                 self._prefix = prefix
-                if len(candidates) == 1:
-                    self._insert_completion(candidates[0])
-                else:
-                    self._popup.populate(candidates)
-                    self._show_popup()
+                self._popup.populate(candidates)
+                self._show_popup()
 
     def accept_current(self) -> bool:
         """Insert the currently highlighted popup item."""
@@ -174,11 +170,15 @@ class PdbCompleter(QtCore.QObject):
     # ------------------------------------------------------------------
 
     def _show_popup(self) -> None:
+        # cursorRect() is in viewport coords; map to screen for a top-level window.
         rect = self._console.cursorRect()
-        pos = rect.bottomLeft()
-        vp_height = self._console.viewport().height()
-        if pos.y() + self._popup.height() > vp_height:
-            pos = rect.topLeft() - QtCore.QPoint(0, self._popup.height())
+        global_bottom = self._console.viewport().mapToGlobal(rect.bottomLeft())
+        global_top = self._console.viewport().mapToGlobal(rect.topLeft())
+        screen = self._console.screen().availableGeometry()
+        pos = global_bottom
+        # Flip above cursor if popup would go off the bottom of the screen.
+        if pos.y() + self._popup.height() > screen.bottom():
+            pos = QtCore.QPoint(global_top.x(), global_top.y() - self._popup.height())
         self._popup.move(pos)
         self._popup.show()
         self._popup.raise_()
