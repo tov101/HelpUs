@@ -20,10 +20,8 @@ class Frames(QtCore.QObject):
         self._globals = self.parent().tw_globals
 
         self.p_index = 0
-
         self._trace = []
-
-        self._stack = []
+        self._frame_objects = []  # Python frame objects captured at last update()
 
     def __add_object(self, name, value, parent=None, tree=None):
         if parent:
@@ -93,52 +91,34 @@ class Frames(QtCore.QObject):
                 tree.resizeColumnToContents(i)
 
     def _refresh_variables(self):
-        """Refresh the variables panel for the currently selected frame without triggering navigation."""
+        """Refresh the variables panel for the currently selected frame."""
         idx = self._frames.currentRow()
         if idx < 0:
             return
-        current_item = self._frames.item(idx)
-        if not current_item:
+        if not self._frames.item(idx):
             return
 
-        # For the top (current) frame use PDB's authoritative locals dict so that
-        # assignments made at the PDB prompt (e.g. "x = 5") are reflected immediately.
-        pdb_locals, pdb_globals = self._get_pdb_locals()
+        # Top frame: use PDB's authoritative locals for real-time accuracy.
+        if idx == 0:
+            pdb_locals, pdb_globals = self._get_pdb_locals()
+            if pdb_locals is not None:
+                self._populate_trees(pdb_locals, pdb_globals)
+                return
 
-        if idx == 0 and pdb_locals is not None:
-            self._populate_trees(pdb_locals, pdb_globals)
-            return
-
-        frame = None
-        for f in inspect.stack():
-            if f"{f.function}, {os.path.basename(f.filename)}:{f.lineno}" == current_item.text():
-                frame = f[0]
-                break
-
-        if frame is not None:
+        if 0 <= idx < len(self._frame_objects):
+            frame = self._frame_objects[idx]
             self._populate_trees(frame.f_locals, frame.f_globals)
         else:
             self._populate_trees({}, {})
 
     def update(self):
-        # Restore the saved frame list after a PDB up/down navigation command.
-        if self._stack:
-            with QtCore.QSignalBlocker(self._frames):
-                self._frames.clear()
-                for frame in self._stack:
-                    self._frames.addItem(frame)
-                self._stack = []
-                self._frames.setCurrentRow(0)
-            self.p_index = 0
-            self._refresh_variables()
-            return
-
         current_frame = self.__find_current_frame()
         self._trace = []
 
         if current_frame:
             with QtCore.QSignalBlocker(self._frames):
                 self._frames.clear()
+                self._frame_objects = []
                 found = False
                 for frame in inspect.stack():
                     _frame = f"{frame.function}, {os.path.basename(frame.filename)}:{frame.lineno}"
@@ -146,48 +126,33 @@ class Frames(QtCore.QObject):
                     current_function, current_filename, current_lineno = current_frame
                     if (
                         current_function.lower() == frame.function.lower()
-                        # May be .py or .pyc
                         and current_filename.lower() in (frame_filename, f"{frame_filename}c")
                         and str(current_lineno) == str(frame.lineno)
                     ) or found:
                         self._frames.addItem(_frame)
+                        self._frame_objects.append(frame[0])
                         found = True
                 self._frames.setCurrentRow(0)
             self.p_index = 0
 
-        # Always refresh variables — covers both "frame found" and "expression-only" prompts.
+        # Always refresh variables — covers both new frames and expression-only prompts.
         self._refresh_variables()
 
     def __refresh(self, index):
-        command = None
-        current_item = self._frames.item(index)
-        if not current_item:
+        """Show variables for the selected frame (read-only; does not issue PDB commands)."""
+        if not self._frames.item(index):
             return
-        if self.p_index > index:
-            command = "down"
-        elif self.p_index < index:
-            command = "up"
 
-        if command:
-            # Save Stack
-            for row in range(self._frames.count()):
-                self._stack.append(self._frames.item(row).text())
-            for n in range(abs(index - self.p_index)):
-                self.__request(command)
+        # Top frame: use PDB's live locals for real-time accuracy.
+        if index == 0:
+            pdb_locals, pdb_globals = self._get_pdb_locals()
+            if pdb_locals is not None:
+                self._populate_trees(pdb_locals, pdb_globals)
+                self.p_index = index
+                return
 
-        frame = None
-        for f in inspect.stack():
-            frame_description = f"{f.function}, {os.path.basename(f.filename)}:{f.lineno}"
-            if frame_description == current_item.text():
-                frame = f
-                break
+        if 0 <= index < len(self._frame_objects):
+            frame = self._frame_objects[index]
+            self._populate_trees(frame.f_locals, frame.f_globals)
 
-        if not frame:
-            return
-        frame = frame[0]
-
-        self._populate_trees(frame.f_locals, frame.f_globals)
         self.p_index = index
-
-    def __request(self, command):
-        self.execute.emit(command)

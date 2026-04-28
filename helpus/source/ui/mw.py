@@ -36,7 +36,7 @@ class Ui_Dialog(object):
     def setupUi(self, Dialog):
         if not Dialog.objectName():
             Dialog.setObjectName("Dialog")
-        Dialog.resize(1200, 620)
+        Dialog.resize(1000, 320)
         icon = QIcon()
         icon.addFile(":/snake.ico", QSize(), QIcon.Normal, QIcon.Off)
         Dialog.setWindowIcon(icon)
