@@ -157,8 +157,9 @@ class BaseConsole(QtWidgets.QTextEdit):
 
             if not intercepted and event.text():
                 intercepted = True
-                self.insertText(event.text())
-                self.completer.update_prefix()
+                ch = event.text()
+                self.insertText(ch)
+                self.completer.update_or_trigger(ch)
 
         return intercepted
 

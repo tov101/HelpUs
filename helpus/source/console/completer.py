@@ -2,14 +2,17 @@
 """
 Autocompleter for the PDB console.
 
-Provides Tab / Ctrl+Space completion using:
-  - Python keywords and builtins (static list from PythonSyntax)
-  - Names from the active Pdb frame's locals and globals (live, via pdb.Pdb.curframe_locals)
+Triggered by:
+  - Typing: auto-shows after ≥2 word chars; immediately on '.' (attribute access)
+  - Tab / Ctrl+Space: explicit trigger or accept highlighted item
 
-The completion popup is a QListWidget embedded as a child of the console's
-viewport widget.  This avoids all top-level-window complications (focus
-stealing, OS-level auto-dismiss, coordinate-space mismatches) that arise
-when combining QCompleter or Qt.ToolTip windows with QTextEdit.
+Completion sources:
+  - Python keywords and builtins (static)
+  - Names from the active Pdb frame's locals and globals (live)
+  - Attributes of objects via dir() for dotted expressions (e.g. 'my_list.ap')
+
+The popup is a QListWidget embedded as a child of the console's viewport,
+so it never steals focus and needs no coordinate-space mapping.
 """
 
 import inspect
@@ -28,8 +31,6 @@ class _CompletionPopup(QtWidgets.QListWidget):
     item_accepted = QtCore.Signal(str)
 
     def __init__(self, console):
-        # Parent = viewport so the popup lives inside the text area,
-        # which means viewport-coordinate positioning works directly.
         super().__init__(console.viewport())
         self.setFocusPolicy(Qt.NoFocus)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -67,6 +68,10 @@ class _CompletionPopup(QtWidgets.QListWidget):
 class PdbCompleter(QtCore.QObject):
     """Autocompletion controller for a BaseConsole widget."""
 
+    # Minimum prefix length to auto-trigger (for plain names).
+    # Attribute access (dotted expressions) always triggers immediately.
+    AUTO_TRIGGER_MIN = 2
+
     _STATIC_NAMES = sorted(set(PythonSyntax.keywords) | set(PythonSyntax.builtins))
 
     def __init__(self, console):
@@ -83,7 +88,7 @@ class PdbCompleter(QtCore.QObject):
     def trigger(self) -> bool:
         """Trigger completion at the current cursor position.
 
-        Returns True if a popup was shown or a single match was inserted directly.
+        Returns True if a popup was shown or a single match was inserted.
         """
         if not self._console.isEnabled():
             return False
@@ -98,17 +103,7 @@ class PdbCompleter(QtCore.QObject):
             self._insert_completion(candidates[0])
             return True
         self._popup.populate(candidates)
-        # cursorRect() is already in viewport coordinates — no mapping needed
-        # because the popup is a child of the viewport.
-        rect = self._console.cursorRect()
-        pos = rect.bottomLeft()
-        # Keep the popup within the visible viewport height.
-        vp_height = self._console.viewport().height()
-        if pos.y() + self._popup.height() > vp_height:
-            pos = rect.topLeft() - QtCore.QPoint(0, self._popup.height())
-        self._popup.move(pos)
-        self._popup.show()
-        self._popup.raise_()
+        self._show_popup()
         return True
 
     def update_prefix(self) -> None:
@@ -126,11 +121,33 @@ class PdbCompleter(QtCore.QObject):
         self._prefix = prefix
         self._popup.populate(candidates)
 
-    def accept_current(self) -> bool:
-        """Insert the currently highlighted popup item.
+    def update_or_trigger(self, ch: str = "") -> None:
+        """Called after each character is typed.
 
-        Returns True if an item was accepted, False if the popup was not visible.
+        If the popup is already visible, re-filter it.
+        Otherwise auto-trigger when conditions are met:
+          - '.' was just typed → show all attributes of the preceding object
+          - a word character was typed and prefix length >= AUTO_TRIGGER_MIN
         """
+        if self._popup.isVisible():
+            self.update_prefix()
+            return
+        prefix = self._get_prefix()
+        if not prefix:
+            return
+        # Always trigger on dotted access; trigger plain names after threshold.
+        if "." in prefix or (ch not in (".", "") and len(prefix) >= self.AUTO_TRIGGER_MIN):
+            candidates = self._get_candidates(prefix)
+            if candidates:
+                self._prefix = prefix
+                if len(candidates) == 1:
+                    self._insert_completion(candidates[0])
+                else:
+                    self._popup.populate(candidates)
+                    self._show_popup()
+
+    def accept_current(self) -> bool:
+        """Insert the currently highlighted popup item."""
         if not self._popup.isVisible():
             return False
         text = self._popup.current_text()
@@ -156,20 +173,58 @@ class PdbCompleter(QtCore.QObject):
     # Internals
     # ------------------------------------------------------------------
 
+    def _show_popup(self) -> None:
+        rect = self._console.cursorRect()
+        pos = rect.bottomLeft()
+        vp_height = self._console.viewport().height()
+        if pos.y() + self._popup.height() > vp_height:
+            pos = rect.topLeft() - QtCore.QPoint(0, self._popup.height())
+        self._popup.move(pos)
+        self._popup.show()
+        self._popup.raise_()
+
     def _get_prefix(self) -> str:
+        """Return the word (or dotted expression) immediately before the cursor."""
         buf = self._console._get_line_until_cursor()
-        m = re.search(r"\w+$", buf)
+        # Match dotted attribute access (e.g. 'my_list.app') or a plain name.
+        m = re.search(r"[\w][\w.]*$", buf)
         return m.group(0) if m else ""
 
     def _get_candidates(self, prefix: str) -> list:
-        names = set(self._STATIC_NAMES)
+        if "." in prefix:
+            return self._get_attr_candidates(prefix)
         locs, globs = self._get_pdb_frame_names()
+        names = set(self._STATIC_NAMES)
         names.update(locs)
         names.update(globs)
         return sorted(n for n in names if n.startswith(prefix))
 
+    def _get_attr_candidates(self, prefix: str) -> list:
+        """Return completions for a dotted expression like 'my_list.app'."""
+        dot = prefix.rfind(".")
+        obj_expr = prefix[:dot]
+        attr_prefix = prefix[dot + 1:]
+        if not obj_expr:
+            return []
+        try:
+            import pdb as _pdb
+            for fi in inspect.stack():
+                obj_self = fi.frame.f_locals.get("self")
+                if (
+                    isinstance(obj_self, _pdb.Pdb)
+                    and getattr(obj_self, "curframe", None) is not None
+                ):
+                    locs = obj_self.curframe_locals
+                    globs = obj_self.curframe.f_globals
+                    evaluated = eval(obj_expr, globs, locs)  # noqa: S307
+                    attrs = sorted(a for a in dir(evaluated) if a.startswith(attr_prefix))
+                    return [f"{obj_expr}.{a}" for a in attrs]
+        except Exception:
+            pass
+        return []
+
     def _get_pdb_frame_names(self):
-        """Return (locals_names, globals_names) from the active Pdb frame."""
+        """Return (locals_keys, globals_keys) from the active Pdb frame."""
         try:
             import pdb as _pdb
             for fi in inspect.stack():
