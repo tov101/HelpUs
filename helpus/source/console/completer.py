@@ -6,8 +6,10 @@ Provides Tab / Ctrl+Space completion using:
   - Python keywords and builtins (static list from PythonSyntax)
   - Names from the active Pdb frame's locals and globals (live, via pdb.Pdb.curframe_locals)
 
-Uses a plain QListWidget tooltip-popup to avoid the focus-stealing and coordinate
-mapping issues that QCompleter has when combined with QTextEdit.
+The completion popup is a QListWidget embedded as a child of the console's
+viewport widget.  This avoids all top-level-window complications (focus
+stealing, OS-level auto-dismiss, coordinate-space mismatches) that arise
+when combining QCompleter or Qt.ToolTip windows with QTextEdit.
 """
 
 import inspect
@@ -21,32 +23,30 @@ from helpus.source.console.syntax import PythonSyntax
 
 
 class _CompletionPopup(QtWidgets.QListWidget):
-    """Borderless floating list used as the completion dropdown.
-
-    Uses Qt.ToolTip window flag so it never steals keyboard focus from the
-    text editor — all key events continue to arrive at the editor widget.
-    """
+    """Completion dropdown rendered directly inside the console's viewport."""
 
     item_accepted = QtCore.Signal(str)
 
-    def __init__(self):
-        super().__init__(None)
-        self.setWindowFlags(Qt.ToolTip)
+    def __init__(self, console):
+        # Parent = viewport so the popup lives inside the text area,
+        # which means viewport-coordinate positioning works directly.
+        super().__init__(console.viewport())
         self.setFocusPolicy(Qt.NoFocus)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setMouseTracking(True)
+        self.hide()
         self.itemClicked.connect(lambda item: self.item_accepted.emit(item.text()))
 
     def populate(self, candidates: list) -> None:
         self.clear()
         for c in candidates:
             self.addItem(c)
-        if self.count():
-            self.setCurrentRow(0)
-        # Resize to content (capped at 8 visible rows)
-        rows = min(self.count(), 8)
-        row_h = self.sizeHintForRow(0) if self.count() else 20
+        if not self.count():
+            return
+        self.setCurrentRow(0)
+        row_h = max(self.sizeHintForRow(0), 18)
         col_w = self.sizeHintForColumn(0) + 24
+        rows = min(self.count(), 8)
         self.setFixedSize(max(col_w, 120), rows * row_h + 4)
 
     def select_next(self) -> None:
@@ -72,7 +72,7 @@ class PdbCompleter(QtCore.QObject):
     def __init__(self, console):
         super().__init__(console)
         self._console = console
-        self._popup = _CompletionPopup()
+        self._popup = _CompletionPopup(console)
         self._popup.item_accepted.connect(self._insert_completion)
         self._prefix = ""
 
@@ -98,11 +98,17 @@ class PdbCompleter(QtCore.QObject):
             self._insert_completion(candidates[0])
             return True
         self._popup.populate(candidates)
-        # cursorRect() is in viewport coordinates; map to global for a top-level popup
-        cursor_rect = self._console.cursorRect()
-        global_pos = self._console.viewport().mapToGlobal(cursor_rect.bottomLeft())
-        self._popup.move(global_pos)
+        # cursorRect() is already in viewport coordinates — no mapping needed
+        # because the popup is a child of the viewport.
+        rect = self._console.cursorRect()
+        pos = rect.bottomLeft()
+        # Keep the popup within the visible viewport height.
+        vp_height = self._console.viewport().height()
+        if pos.y() + self._popup.height() > vp_height:
+            pos = rect.topLeft() - QtCore.QPoint(0, self._popup.height())
+        self._popup.move(pos)
         self._popup.show()
+        self._popup.raise_()
         return True
 
     def update_prefix(self) -> None:

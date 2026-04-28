@@ -133,6 +133,8 @@ class BaseConsole(QtWidgets.QTextEdit):
             self.insertText(mime_data.text())
 
     def _filter_mousePressEvent(self, event):
+        if self.completer.is_popup_visible():
+            self.completer.hide_popup()
         if event.button() == Qt.MiddleButton:
             clipboard = QApplication.clipboard()
             mime_data = clipboard.mimeData(QClipboard.Selection)
@@ -354,7 +356,9 @@ class BaseConsole(QtWidgets.QTextEdit):
     def _handle_a_key(self, event):
         """Ctrl+A selects all text in the console (entire history + input)."""
         if event.modifiers() == Qt.ControlModifier:
-            self.selectAll()
+            cursor = self.textCursor()
+            cursor.select(QTextCursor.SelectionType.Document)
+            self.setTextCursor(cursor)
             return True
         return False
 
