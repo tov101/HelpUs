@@ -4,7 +4,7 @@ import re
 
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import QEvent
-from PySide6.QtGui import QClipboard, Qt, QTextCursor
+from PySide6.QtGui import QClipboard, QFont, QFontDatabase, Qt, QTextCursor
 from PySide6.QtWidgets import QApplication
 
 from helpus import not_used
@@ -13,6 +13,27 @@ from helpus.source.console.completer import PdbCompleter
 from helpus.source.console.syntax import SyntaxHighlighter
 
 LOGGER = logging.getLogger("HelpUs")
+
+# Monospace fonts tried in priority order; first available one wins.
+_PREFERRED_FONTS = [
+    "Cascadia Code",
+    "Cascadia Mono",
+    "JetBrains Mono",
+    "Fira Code",
+    "Consolas",
+    "Lucida Console",
+    "Courier New",
+]
+
+
+def _console_font(size: int = 10) -> QFont:
+    available = set(QFontDatabase.families())
+    for name in _PREFERRED_FONTS:
+        if name in available:
+            return QFont(name, size)
+    font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+    font.setPointSize(size)
+    return font
 
 
 class BaseConsole(QtWidgets.QTextEdit):
@@ -35,6 +56,9 @@ class BaseConsole(QtWidgets.QTextEdit):
         self._current_header = BaseConsole.HOOK_PDB
         self._default_position = 0
         self._tab_chars = " " * 4
+
+        # Monospace font — keeps code and output properly aligned
+        self.setFont(_console_font())
 
         # Do not Accept Rich Text
         self.setAcceptRichText(False)
