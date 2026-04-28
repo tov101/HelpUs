@@ -62,41 +62,93 @@ class Frames(QtCore.QObject):
     def trace(self, text):
         self._trace.append(text)
 
+    def _get_pdb_locals(self):
+        """Find the active Pdb instance and return its authoritative (locals, globals) dicts."""
+        try:
+            import pdb as _pdb
+            for fi in inspect.stack():
+                obj = fi.frame.f_locals.get("self")
+                if (
+                    obj is not None
+                    and isinstance(obj, _pdb.Pdb)
+                    and getattr(obj, "curframe", None) is not None
+                ):
+                    return obj.curframe_locals, obj.curframe.f_globals
+        except Exception:
+            pass
+        return None, None
+
+    def _refresh_variables(self):
+        """Refresh the variables panel for the currently selected frame without triggering navigation."""
+        idx = self._frames.currentRow()
+        if idx < 0:
+            return
+        current_item = self._frames.item(idx)
+        if not current_item:
+            return
+
+        # For the top (current) frame use PDB's authoritative locals dict so that
+        # assignments made at the PDB prompt (e.g. "x = 5") are reflected immediately.
+        pdb_locals, pdb_globals = self._get_pdb_locals()
+
+        frame = None
+        for f in inspect.stack():
+            if f"{f.function}, {os.path.basename(f.filename)}:{f.lineno}" == current_item.text():
+                frame = f[0]
+                break
+
+        self._objects.clear()
+        if idx == 0 and pdb_locals is not None:
+            for name, value in pdb_locals.items():
+                self.__add_object(name=name, value=value)
+            for name, value in (pdb_globals or {}).items():
+                self.__add_object(name=name, value=value)
+        elif frame is not None:
+            for name, value in frame.f_locals.items():
+                self.__add_object(name=name, value=value)
+            for name, value in frame.f_globals.items():
+                self.__add_object(name=name, value=value)
+
+        for i in range(self._objects.columnCount()):
+            self._objects.resizeColumnToContents(i)
+
     def update(self):
-        # Keep the old stack.
+        # Restore the saved frame list after a PDB up/down navigation command.
         if self._stack:
-            # Clear Frames ListWidget
-            self._frames.clear()
-            for frame in self._stack:
-                self._frames.addItem(frame)
-            self._stack = []
+            with QtCore.QSignalBlocker(self._frames):
+                self._frames.clear()
+                for frame in self._stack:
+                    self._frames.addItem(frame)
+                self._stack = []
+                self._frames.setCurrentRow(0)
+            self.p_index = 0
+            self._refresh_variables()
             return
 
         current_frame = self.__find_current_frame()
-        if not current_frame:
-            return
-
-        # Clear Frames ListWidget
-        self._frames.clear()
-
-        found = False
-        for frame in inspect.stack():
-            _frame = f"{frame.function}, {os.path.basename(frame.filename)}:{frame.lineno}"
-            frame_filename = os.path.basename(frame.filename).lower()
-
-            current_function, current_filename, current_lineno = current_frame
-            if (
-                current_function.lower() == frame.function.lower()
-                # Maybe be py or may be pyc
-                and current_filename.lower() in (frame_filename, f"{frame_filename}c")
-                and str(current_lineno) == str(frame.lineno)
-            ) or found:
-                self._frames.addItem(_frame)
-                found = True
         self._trace = []
 
-        # Set Selected Current Frame
-        self._frames.setCurrentRow(0)
+        if current_frame:
+            with QtCore.QSignalBlocker(self._frames):
+                self._frames.clear()
+                found = False
+                for frame in inspect.stack():
+                    _frame = f"{frame.function}, {os.path.basename(frame.filename)}:{frame.lineno}"
+                    frame_filename = os.path.basename(frame.filename).lower()
+                    current_function, current_filename, current_lineno = current_frame
+                    if (
+                        current_function.lower() == frame.function.lower()
+                        # May be .py or .pyc
+                        and current_filename.lower() in (frame_filename, f"{frame_filename}c")
+                        and str(current_lineno) == str(frame.lineno)
+                    ) or found:
+                        self._frames.addItem(_frame)
+                        found = True
+                self._frames.setCurrentRow(0)
+            self.p_index = 0
+
+        # Always refresh variables — covers both "frame found" and "expression-only" prompts.
+        self._refresh_variables()
 
     def __refresh(self, index):
         command = None

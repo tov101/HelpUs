@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication
 
 from helpus import not_used
 from helpus.source.console.commandhistory import CommandHistory
+from helpus.source.console.completer import PdbCompleter
 from helpus.source.console.syntax import SyntaxHighlighter
 
 LOGGER = logging.getLogger("HelpUs")
@@ -53,6 +54,10 @@ class BaseConsole(QtWidgets.QTextEdit):
         self.setFocus()
 
         SyntaxHighlighter(self.document())
+        # Completer — must be created AFTER installEventFilter so QCompleter's
+        # internal filter (installed via setWidget) is registered last and
+        # therefore runs first (Qt LIFO event-filter order).
+        self.completer = PdbCompleter(self)
 
     def show_header(self):
         cursor = self.textCursor()
@@ -118,6 +123,7 @@ class BaseConsole(QtWidgets.QTextEdit):
             Qt.Key_Up: self._handle_up_key,
             Qt.Key_Down: self._handle_down_key,
             Qt.Key_Left: self._handle_left_key,
+            Qt.Key_Space: self._handle_space_key,
             Qt.Key_C: self._handle_c_key,
             Qt.Key_V: self._handle_v_key,
         }
@@ -150,21 +156,25 @@ class BaseConsole(QtWidgets.QTextEdit):
             if not intercepted and event.text():
                 intercepted = True
                 self.insertText(event.text())
-                # self.insertPlainText(event.text())
+                self.completer.update_prefix()
 
         return intercepted
 
     def _handle_escape_key(self, event):
-        not_used(self)
         not_used(event)
+        if self.completer.is_popup_visible():
+            self.completer.hide_popup()
+            return True
         return True
 
     def _handle_enter_key(self, event):
         """
-        Handle Enter Key -> Send data to stdin buffer and store the command in history
-        :param event:
-        :return:
+        Handle Enter Key -> Send data to stdin buffer and store the command in history.
+        When the completer popup is visible, accept the highlighted item instead.
         """
+        if self.completer.is_popup_visible():
+            self.completer.accept_current()
+            return True
         cursor = self.textCursor()
         cursor.movePosition(QTextCursor.End)
         self.setTextCursor(cursor)
@@ -208,6 +218,7 @@ class BaseConsole(QtWidgets.QTextEdit):
                 num = len(tab) if tabstop and buf.endswith(tab) else 1
                 cursor.movePosition(QTextCursor.PreviousCharacter, QTextCursor.KeepAnchor, num)
         self._remove_selected_input(cursor)
+        self.completer.update_prefix()
         return True
 
     def _handle_delete_key(self, event):
@@ -236,19 +247,27 @@ class BaseConsole(QtWidgets.QTextEdit):
 
     def _handle_tab_key(self, event):
         """
-        Tab Key -> 4 spaces.
-        :param event:
-        :return:
+        Tab Key: accept completer item if popup is visible, otherwise trigger
+        completion when there is a word prefix, or insert spaces to the next
+        tab-stop boundary.
         """
         cursor = self.textCursor()
         if cursor.hasSelection():
             self.setTextCursor(self._indent_selection(cursor))
-        else:
-            # add spaces until next tabstop boundary:
-            tab = self._tab_chars
-            buf = self._get_line_until_cursor()
-            num = len(tab) - len(buf) % len(tab)
-            self.insertText(tab[:num])
+            event.accept()
+            return True
+        if self.completer.is_popup_visible():
+            self.completer.accept_current()
+            event.accept()
+            return True
+        if self.completer.trigger():
+            event.accept()
+            return True
+        # Default: insert spaces up to the next tab-stop boundary.
+        tab = self._tab_chars
+        buf = self._get_line_until_cursor()
+        num = len(tab) - len(buf) % len(tab)
+        self.insertText(tab[:num])
         event.accept()
         return True
 
@@ -295,6 +314,9 @@ class BaseConsole(QtWidgets.QTextEdit):
         return True
 
     def _handle_up_key(self, event):
+        if self.completer.is_popup_visible():
+            # QCompleter's event filter (LIFO: runs before ours) already handled this.
+            return False
         shift = event.modifiers() & Qt.ShiftModifier
         if shift or "\n" in self.input_buffer()[: self.cursor_offset()]:
             self._move_cursor(QTextCursor.Up, select=shift)
@@ -303,6 +325,9 @@ class BaseConsole(QtWidgets.QTextEdit):
         return True
 
     def _handle_down_key(self, event):
+        if self.completer.is_popup_visible():
+            # QCompleter's event filter (LIFO: runs before ours) already handled this.
+            return False
         shift = event.modifiers() & Qt.ShiftModifier
         if shift or "\n" in self.input_buffer()[self.cursor_offset() :]:
             self._move_cursor(QTextCursor.Down, select=shift)
@@ -318,6 +343,13 @@ class BaseConsole(QtWidgets.QTextEdit):
         :return:
         """
         return self.cursor_offset() <= 0
+
+    def _handle_space_key(self, event):
+        """Ctrl+Space triggers explicit completion; plain Space falls through."""
+        if event.modifiers() & Qt.ControlModifier:
+            self.completer.trigger()
+            return True
+        return False
 
     def _handle_c_key(self, event):
         intercepted = False
