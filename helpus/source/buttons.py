@@ -29,7 +29,9 @@ class Buttons(QtCore.QObject):
         return (getattr(self.parent(), f"pb_{button_text}") for button_text in self._BUTTONS)
 
     def __request(self):
-        button_scope = self.sender().text()
-        button_scope = button_scope.replace("(", "")
-        button_scope = button_scope.replace(")", "")
-        self.execute.emit(button_scope)
+        cmd = self.sender().property("pdb_command")
+        if not cmd:
+            # Fallback: parse legacy "(c)ontinue" style text
+            cmd = self.sender().text().replace("(", "").replace(")", "")
+        if cmd:
+            self.execute.emit(cmd)

@@ -17,6 +17,7 @@ class Frames(QtCore.QObject):
         self._frames.currentRowChanged.connect(self.__refresh)
 
         self._objects = self.parent().tw_objects
+        self._globals = self.parent().tw_globals
 
         self.p_index = 0
 
@@ -24,23 +25,24 @@ class Frames(QtCore.QObject):
 
         self._stack = []
 
-    def __add_object(self, name, value, parent=None):
+    def __add_object(self, name, value, parent=None, tree=None):
         if parent:
-            parent = QtWidgets.QTreeWidgetItem(parent, [type(value).__name__, name])
+            item = QtWidgets.QTreeWidgetItem(parent, [type(value).__name__, str(name)])
         else:
-            parent = QtWidgets.QTreeWidgetItem(self._objects, [type(value).__name__, name])
+            root = tree if tree is not None else self._objects
+            item = QtWidgets.QTreeWidgetItem(root, [type(value).__name__, str(name)])
 
         if isinstance(value, list):
             for index, v in enumerate(value):
-                self.__add_object(parent=parent, name=index, value=v)
+                self.__add_object(parent=item, name=index, value=v)
         elif isinstance(value, dict):
             for k, v in value.items():
-                self.__add_object(parent=parent, name=k, value=v)
+                self.__add_object(parent=item, name=k, value=v)
         elif isinstance(value, set):
             for index, v in enumerate(value):
-                self.__add_object(parent=parent, name=index, value=v)
+                self.__add_object(parent=item, name=index, value=v)
         else:
-            parent.setText(2, str(value))
+            item.setText(2, str(value))
 
     def __find_current_frame(self):
         # Find Current Frame in 'stdout'
@@ -78,6 +80,18 @@ class Frames(QtCore.QObject):
             pass
         return None, None
 
+    def _populate_trees(self, locals_dict, globals_dict):
+        """Clear both variable trees and repopulate from the given dicts."""
+        self._objects.clear()
+        self._globals.clear()
+        for name, value in (locals_dict or {}).items():
+            self.__add_object(name=name, value=value, tree=self._objects)
+        for name, value in (globals_dict or {}).items():
+            self.__add_object(name=name, value=value, tree=self._globals)
+        for tree in (self._objects, self._globals):
+            for i in range(tree.columnCount()):
+                tree.resizeColumnToContents(i)
+
     def _refresh_variables(self):
         """Refresh the variables panel for the currently selected frame without triggering navigation."""
         idx = self._frames.currentRow()
@@ -91,26 +105,20 @@ class Frames(QtCore.QObject):
         # assignments made at the PDB prompt (e.g. "x = 5") are reflected immediately.
         pdb_locals, pdb_globals = self._get_pdb_locals()
 
+        if idx == 0 and pdb_locals is not None:
+            self._populate_trees(pdb_locals, pdb_globals)
+            return
+
         frame = None
         for f in inspect.stack():
             if f"{f.function}, {os.path.basename(f.filename)}:{f.lineno}" == current_item.text():
                 frame = f[0]
                 break
 
-        self._objects.clear()
-        if idx == 0 and pdb_locals is not None:
-            for name, value in pdb_locals.items():
-                self.__add_object(name=name, value=value)
-            for name, value in (pdb_globals or {}).items():
-                self.__add_object(name=name, value=value)
-        elif frame is not None:
-            for name, value in frame.f_locals.items():
-                self.__add_object(name=name, value=value)
-            for name, value in frame.f_globals.items():
-                self.__add_object(name=name, value=value)
-
-        for i in range(self._objects.columnCount()):
-            self._objects.resizeColumnToContents(i)
+        if frame is not None:
+            self._populate_trees(frame.f_locals, frame.f_globals)
+        else:
+            self._populate_trees({}, {})
 
     def update(self):
         # Restore the saved frame list after a PDB up/down navigation command.
@@ -178,19 +186,7 @@ class Frames(QtCore.QObject):
             return
         frame = frame[0]
 
-        self._objects.clear()
-        # Add Locals
-        for name, value in frame.f_locals.items():
-            self.__add_object(name=name, value=value)
-
-        # Add Globals
-        for name, value in frame.f_globals.items():
-            self.__add_object(name=name, value=value)
-
-        # Resize
-        for i in range(self._objects.columnCount()):
-            self._objects.resizeColumnToContents(i)
-
+        self._populate_trees(frame.f_locals, frame.f_globals)
         self.p_index = index
 
     def __request(self, command):
