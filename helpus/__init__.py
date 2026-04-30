@@ -1,37 +1,27 @@
+import importlib.util
 import logging.config
 import os
+import sys
 
 
-def _detect_or_install_qt():
-    """
-    Return the QT_API name for the Qt binding already present in the environment.
-    Priority: PyQt6 > PySide6 > PyQt5 > PySide2.
-    If none is found, PySide6 is installed automatically.
-    """
-    import importlib.util
-
-    candidates = [
-        ("pyqt6",   "PyQt6"),
-        ("pyside6", "PySide6"),
-        ("pyqt5",   "PyQt5"),
-        ("pyside2", "PySide2"),
-    ]
-    for api_name, module_name in candidates:
-        if importlib.util.find_spec(module_name) is not None:
-            return api_name
-
-    # No Qt binding found — install PySide6 as the fallback.
-    import subprocess
-    import sys
-    subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "PySide6-Essentials"],
-        stdout=subprocess.DEVNULL,
-    )
-    return "pyside6"
+# On Windows, register any shiboken6 / PySide6 directories found on sys.path as
+# DLL search directories *before* importing Qt.  This is needed when helpus is
+# imported inside a frozen executable (e.g. eval_tool) whose own DLL search path
+# does not include the Qt DLLs that were passed via --py_libs / sys.path.
+if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
+    for _pkg in ("shiboken6", "PySide6"):
+        _spec = importlib.util.find_spec(_pkg)
+        if _spec and _spec.submodule_search_locations:
+            for _loc in _spec.submodule_search_locations:
+                try:
+                    os.add_dll_directory(_loc)
+                except Exception:
+                    pass
 
 
-# Respect an existing QT_API set by the host application; otherwise auto-detect.
-os.environ.setdefault("QT_API", _detect_or_install_qt())
+# Ensure QT_API is set early so qtpy picks the right binding.
+if not os.environ.get("QT_API"):
+    os.environ.setdefault("QT_API", "pyside6")
 
 
 # Do not Import Stuff from 'module' here because will raise ImportError because of Circular import
@@ -41,7 +31,7 @@ def not_used(item):
 
 
 # Define Log File
-helpus_log_file = os.path.join(os.path.dirname(__file__), "HelpUs.log")
+helpus_log_file = os.path.join(os.path.dirname(__file__) or ".", "HelpUs.log")
 
 # CleanUp Existing LogFile
 if os.path.exists(helpus_log_file):
@@ -54,21 +44,43 @@ __all__ = ["HelpUs", "get_qtconsole_object", "setup_breakpoint", "setup_breakpoi
 
 
 def _lazy_imports():
-    from helpus.source.core import (
-        get_qtconsole_object,
-        HelpUs,
-        setup_breakpoint,
-        setup_breakpoint_hook,
-    )
+    try:
+        from helpus.source.core import (
+            get_qtconsole_object,
+            HelpUs,
+            setup_breakpoint,
+            setup_breakpoint_hook,
+        )
+        globals().update(
+            {
+                "HelpUs": HelpUs,
+                "get_qtconsole_object": get_qtconsole_object,
+                "setup_breakpoint": setup_breakpoint,
+                "setup_breakpoint_hook": setup_breakpoint_hook,
+            }
+        )
+    except Exception:
+        # Qt is not available in this environment (e.g. inside eval_tool frozen app).
+        # Provide lightweight no-op fallbacks so that code calling
+        # setup_breakpoint() in non-GUI contexts does not crash on import.
 
-    globals().update(
-        {
-            "HelpUs": HelpUs,
-            "get_qtconsole_object": get_qtconsole_object,
-            "setup_breakpoint": setup_breakpoint,
-            "setup_breakpoint_hook": setup_breakpoint_hook,
-        }
-    )
+        def setup_breakpoint(*args, **kwargs):
+            pass
+
+        def setup_breakpoint_hook(parent, method, *args, **kwargs):
+            return method
+
+        def get_qtconsole_object():
+            raise RuntimeError("HelpUs Qt console is not available in this environment.")
+
+        globals().update(
+            {
+                "HelpUs": None,
+                "get_qtconsole_object": get_qtconsole_object,
+                "setup_breakpoint": setup_breakpoint,
+                "setup_breakpoint_hook": setup_breakpoint_hook,
+            }
+        )
 
 
 _lazy_imports()
